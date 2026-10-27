@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Trophy, Upload, User, CheckCircle2, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import { API_BASE } from '../utils/api';
 
 export const PublicRegistrationPage = ({ tournaments, activeTournament, setActiveTournament, onSuccessRedirect }) => {
   const [formData, setFormData] = useState({
@@ -104,7 +105,7 @@ export const PublicRegistrationPage = ({ tournaments, activeTournament, setActiv
         data.append('idCardProof', idCardFile);
       }
 
-      const response = await fetch('/api/public/players/register', {
+      const response = await fetch(`${API_BASE}/public/players/register`, {
         method: 'POST',
         body: data,
       });

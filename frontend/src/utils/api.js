@@ -1,4 +1,5 @@
-const API_BASE = '/api';
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
+export const API_BASE = `${BACKEND_URL}/api`;
 
 export const apiRequest = async (endpoint, options = {}) => {
   const token = localStorage.getItem('cricauction_token');

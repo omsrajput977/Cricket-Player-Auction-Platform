@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Trophy, User, CheckCircle2, AlertCircle, Clock, Award, XCircle } from 'lucide-react';
+import { API_BASE } from '../utils/api';
 
 export const PublicLookupPage = ({ tournaments, activeTournament, setActiveTournament }) => {
   const [rollNumber, setRollNumber] = useState('');
@@ -24,7 +25,7 @@ export const PublicLookupPage = ({ tournaments, activeTournament, setActiveTourn
 
     try {
       const response = await fetch(
-        `/api/public/players/lookup?tournamentId=${activeTournament._id}&rollNumber=${encodeURIComponent(
+        `${API_BASE}/public/players/lookup?tournamentId=${activeTournament._id}&rollNumber=${encodeURIComponent(
           rollNumber.trim()
         )}`
       );

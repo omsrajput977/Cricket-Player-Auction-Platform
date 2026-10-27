@@ -27,7 +27,10 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 // Setup Socket.io
 export const io = new Server(server, {
   cors: {
-    origin: [CLIENT_URL, 'http://localhost:3000', 'http://127.0.0.1:5173'],
+    origin: (origin, callback) => {
+      // Allow all origins (reflection) for seamless multi-platform deployment (Vercel, Render, Local)
+      callback(null, true);
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true,
   },
@@ -38,7 +41,7 @@ export const io = new Server(server, {
 // Middleware configuration
 app.use(
   cors({
-    origin: [CLIENT_URL, 'http://localhost:3000', 'http://127.0.0.1:5173'],
+    origin: (origin, callback) => callback(null, true),
     credentials: true,
   })
 );

@@ -11,7 +11,8 @@ export const SocketProvider = ({ children }) => {
   const clockOffsetRef = useRef(0);
 
   useEffect(() => {
-    const socketInstance = io('/', {
+    const socketUrl = import.meta.env.VITE_BACKEND_URL || '/';
+    const socketInstance = io(socketUrl, {
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
