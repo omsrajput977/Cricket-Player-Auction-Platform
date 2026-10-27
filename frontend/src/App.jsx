@@ -1,0 +1,69 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from './context/AuthContext';
+import { apiRequest } from './utils/api';
+import { Navbar } from './components/Navbar';
+import { LiveRoomPage } from './pages/LiveRoomPage';
+import { AdminSetupPage } from './pages/AdminSetupPage';
+import { LoginPage } from './pages/LoginPage';
+
+export default function App() {
+  const { user, isAdmin } = useAuth();
+  const [activeView, setActiveView] = useState('live-room');
+  const [tournaments, setTournaments] = useState([]);
+  const [activeTournament, setActiveTournament] = useState(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  // Load Tournaments
+  const loadTournaments = async () => {
+    try {
+      const res = await apiRequest('/tournaments');
+      if (res.success && res.data.length > 0) {
+        setTournaments(res.data);
+        setActiveTournament(res.data[0]);
+      }
+    } catch (err) {
+      console.error('Failed to load tournaments:', err.message);
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTournaments();
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-stadium-darkest text-slate-100 flex flex-col">
+      <Navbar
+        activeView={activeView}
+        setActiveView={setActiveView}
+        tournaments={tournaments}
+        activeTournament={activeTournament}
+        setActiveTournament={setActiveTournament}
+      />
+
+      <main className="flex-1">
+        {activeView === 'login' ? (
+          <LoginPage onLoginSuccess={() => setActiveView('live-room')} />
+        ) : activeView === 'admin-setup' ? (
+          <AdminSetupPage
+            activeTournament={activeTournament}
+            setActiveTournament={setActiveTournament}
+            onTournamentCreated={(newTourney) => {
+              setTournaments((prev) => [newTourney, ...prev]);
+              setActiveTournament(newTourney);
+            }}
+          />
+        ) : (
+          <LiveRoomPage activeTournament={activeTournament} />
+        )}
+      </main>
+
+      <footer className="glass-panel border-t border-stadium-border/60 py-4 px-6 text-center text-xs text-slate-500">
+        <p>
+          CricAuction Live Engine • Sub-millisecond synchronized bidding for collegiate cricket tournaments
+        </p>
+      </footer>
+    </div>
+  );
+}
