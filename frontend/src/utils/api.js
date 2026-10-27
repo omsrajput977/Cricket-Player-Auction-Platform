@@ -18,10 +18,18 @@ export const apiRequest = async (endpoint, options = {}) => {
   }
 
   const response = await fetch(`${API_BASE}${endpoint}`, config);
-  const data = await response.json();
+
+  let data;
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    data = await response.json();
+  } else {
+    const text = await response.text();
+    data = { message: text || `Request failed with status ${response.status}` };
+  }
 
   if (!response.ok) {
-    throw new Error(data.message || 'API request failed');
+    throw new Error(data.message || `API request failed with status ${response.status}`);
   }
 
   return data;
