@@ -65,12 +65,13 @@ export const ActivePodium = ({
     };
   }, [socket]);
 
-  // Find leading team object
-  const leadingTeam = teams?.find((t) => (t._id || t.id) === currentBidderTeamId);
-  const userTeam = teams?.find((t) => (t._id || t.id) === user?.team?.id || (t._id || t.id) === user?.teamId);
+  // Find leading team and user's team object
+  const myTeamId = (user?.team?._id || user?.team?.id || user?.teamId)?.toString();
+  const leadingTeam = teams?.find((t) => (t._id || t.id)?.toString() === currentBidderTeamId?.toString());
+  const userTeam = teams?.find((t) => (t._id || t.id)?.toString() === myTeamId);
 
   // Check if current team already holds highest bid
-  const isUserTeamLeading = userTeam && (userTeam._id || userTeam.id) === currentBidderTeamId;
+  const isUserTeamLeading = Boolean(myTeamId && currentBidderTeamId && myTeamId === currentBidderTeamId.toString());
 
   // Handle One-Click Bid Action
   const handlePlaceBid = () => {

@@ -88,16 +88,20 @@ export const login = async (req, res, next) => {
     }
 
     const token = generateToken(user);
+    const resolvedTeamId = user.teamId
+      ? (user.teamId._id ? user.teamId._id.toString() : user.teamId.toString())
+      : null;
 
     res.status(200).json({
       success: true,
       message: 'Login successful.',
       data: {
         user: {
-          id: user._id,
+          id: user._id.toString(),
           name: user.name,
           email: user.email,
           role: user.role,
+          teamId: resolvedTeamId,
           team: user.teamId || null,
         },
         token,
@@ -119,14 +123,19 @@ export const getMe = async (req, res, next) => {
       select: 'name shortName logoUrl brandColor totalPurse remainingPurse squad tournamentId',
     });
 
+    const resolvedTeamId = user.teamId
+      ? (user.teamId._id ? user.teamId._id.toString() : user.teamId.toString())
+      : null;
+
     res.status(200).json({
       success: true,
       data: {
         user: {
-          id: user._id,
+          id: user._id.toString(),
           name: user.name,
           email: user.email,
           role: user.role,
+          teamId: resolvedTeamId,
           team: user.teamId || null,
         },
       },

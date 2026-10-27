@@ -5,6 +5,7 @@ import Player from '../models/Player.js';
 import Team from '../models/Team.js';
 import Tournament from '../models/Tournament.js';
 import BidHistory from '../models/BidHistory.js';
+import User from '../models/User.js';
 
 export const registerAuctionSocketHandlers = (io) => {
   // Socket JWT Authentication Middleware
@@ -16,10 +17,22 @@ export const registerAuctionSocketHandlers = (io) => {
 
       if (token) {
         const decoded = verifyToken(token);
+        let extractedTeamId = null;
+        if (decoded.teamId) {
+          if (typeof decoded.teamId === 'object' && decoded.teamId._id) {
+            extractedTeamId = decoded.teamId._id.toString();
+          } else if (typeof decoded.teamId === 'string') {
+            const match = decoded.teamId.match(/[a-fA-F0-9]{24}/);
+            extractedTeamId = match ? match[0] : decoded.teamId;
+          } else {
+            extractedTeamId = String(decoded.teamId);
+          }
+        }
+
         socket.data.user = {
           id: decoded.id,
           role: decoded.role,
-          teamId: decoded.teamId || null,
+          teamId: extractedTeamId,
         };
       } else {
         // Unauthenticated spectator
@@ -54,6 +67,9 @@ export const registerAuctionSocketHandlers = (io) => {
 
         socket.join(tournamentId.toString());
         const engine = await getTournamentEngine(tournamentId);
+        if (engine.teamsCache.size === 0) {
+          await engine.hydrate();
+        }
         const snapshot = engine.getSnapshot();
 
         // Fetch recent bids for active player
@@ -237,7 +253,10 @@ export const registerAuctionSocketHandlers = (io) => {
             return socket.emit('ERROR', { message: 'This franchise already holds the highest bid.' });
           }
 
-          const teamCache = engine.teamsCache.get(targetTeamStr);
+          let teamCache = engine.teamsCache.get(targetTeamStr);
+          if (!teamCache) {
+            teamCache = await engine.ensureTeamCached(targetTeamStr);
+          }
           if (!teamCache) {
             return socket.emit('ERROR', { message: 'Target team not found in tournament cache.' });
           }
@@ -346,15 +365,25 @@ export const registerAuctionSocketHandlers = (io) => {
           }
 
           // 4. Socket Security: Derive teamId strictly from verified JWT
-          const teamId = socket.data.user.teamId;
+          let teamId = socket.data.user.teamId;
+          if (!teamId && socket.data.user.id) {
+            const dbUser = await User.findById(socket.data.user.id);
+            if (dbUser && dbUser.teamId) {
+              teamId = dbUser.teamId.toString();
+              socket.data.user.teamId = teamId;
+            }
+          }
+
           if (!teamId) {
             return socket.emit('BID_REJECTED', {
               reason: 'User is not associated with an authorized franchise.',
             });
           }
 
+          const teamIdStr = teamId.toString();
+
           // 5. Guard: Prevent self-bumping
-          if (session.currentBidderTeamId === teamId) {
+          if (session.currentBidderTeamId === teamIdStr) {
             return socket.emit('BID_REJECTED', {
               reason: 'Your team already holds the highest bid.',
             });
@@ -372,8 +401,12 @@ export const registerAuctionSocketHandlers = (io) => {
             });
           }
 
-          // 8. Validate Purse & Reserve using In-Memory Cache (Zero DB queries)
-          const teamCache = engine.teamsCache.get(teamId);
+          // 8. Validate Purse & Reserve using In-Memory Cache (Lazy fallback if missing)
+          let teamCache = engine.teamsCache.get(teamIdStr);
+          if (!teamCache) {
+            teamCache = await engine.ensureTeamCached(teamIdStr);
+          }
+
           const validation = validateBidRules({
             teamCache,
             bidAmount: nextBid,
@@ -390,7 +423,7 @@ export const registerAuctionSocketHandlers = (io) => {
 
           // 9. Accept Bid: Update in-memory authoritative state
           session.currentHighestBid = nextBid;
-          session.currentBidderTeamId = teamId;
+          session.currentBidderTeamId = teamIdStr;
           session.currentBidderUserId = socket.data.user.id;
           session.snapshotVersion += 1;
 
@@ -406,7 +439,7 @@ export const registerAuctionSocketHandlers = (io) => {
           // 11. Broadcast accepted bid to room
           io.to(tournamentId).emit('BID_ACCEPTED', {
             playerId: session.activePlayer._id,
-            teamId,
+            teamId: teamIdStr,
             teamName: teamCache.name,
             teamShortName: teamCache.shortName,
             teamBrandColor: teamCache.brandColor,
@@ -424,7 +457,7 @@ export const registerAuctionSocketHandlers = (io) => {
               await BidHistory.create({
                 tournamentId,
                 playerId: session.activePlayer._id,
-                teamId,
+                teamId: teamIdStr,
                 bidAmount: nextBid,
                 placedBy: socket.data.user.id,
                 bidType: 'OWNER_BID',
@@ -547,7 +580,11 @@ export const registerAuctionSocketHandlers = (io) => {
           }
 
           // Update In-Memory Teams Cache
-          const cachedTeam = engine.teamsCache.get(winningTeamId.toString());
+          const winningTeamStr = winningTeamId.toString();
+          let cachedTeam = engine.teamsCache.get(winningTeamStr);
+          if (!cachedTeam) {
+            cachedTeam = await engine.ensureTeamCached(winningTeamStr);
+          }
           if (cachedTeam) {
             cachedTeam.remainingPurse -= finalPrice;
             cachedTeam.squadCount += 1;

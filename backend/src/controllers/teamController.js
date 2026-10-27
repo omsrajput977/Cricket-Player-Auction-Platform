@@ -1,6 +1,7 @@
 import Team from '../models/Team.js';
 import Tournament from '../models/Tournament.js';
 import User from '../models/User.js';
+import { getTournamentEngine } from '../services/auctionEngine.js';
 
 /**
  * Create a Team (Admin Only)
@@ -64,6 +65,24 @@ export const createTeam = async (req, res, next) => {
         await team.save();
         ownerAccount = { id: newUser._id, email: newUser.email };
       }
+    }
+
+    // Sync into active auction engine memory cache if initialized
+    try {
+      const engine = await getTournamentEngine(tournamentId);
+      if (engine && engine.teamsCache) {
+        engine.teamsCache.set(team._id.toString(), {
+          id: team._id.toString(),
+          name: team.name,
+          shortName: team.shortName,
+          brandColor: team.brandColor,
+          remainingPurse: team.remainingPurse,
+          totalPurse: team.totalPurse,
+          squadCount: 0,
+        });
+      }
+    } catch (cacheErr) {
+      // Ignored if tournament engine not active yet
     }
 
     res.status(201).json({

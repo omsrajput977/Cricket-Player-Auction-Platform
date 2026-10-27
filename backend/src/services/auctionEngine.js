@@ -164,6 +164,37 @@ export class TournamentEngine {
   }
 
   /**
+   * Lazily ensures a team exists in memory cache, querying DB if missing
+   */
+  async ensureTeamCached(teamId) {
+    if (!teamId) return null;
+    const teamIdStr = teamId.toString();
+    if (this.teamsCache.has(teamIdStr)) {
+      return this.teamsCache.get(teamIdStr);
+    }
+
+    try {
+      const team = await Team.findById(teamIdStr);
+      if (team) {
+        const cached = {
+          id: team._id.toString(),
+          name: team.name,
+          shortName: team.shortName,
+          brandColor: team.brandColor,
+          remainingPurse: team.remainingPurse,
+          totalPurse: team.totalPurse,
+          squadCount: team.squad ? team.squad.length : 0,
+        };
+        this.teamsCache.set(teamIdStr, cached);
+        return cached;
+      }
+    } catch (err) {
+      console.error(`Failed to ensure team ${teamIdStr} cached:`, err.message);
+    }
+    return null;
+  }
+
+  /**
    * Resets and starts single countdown timer
    */
   startTimer(durationSeconds, io) {

@@ -29,7 +29,10 @@ export const apiRequest = async (endpoint, options = {}) => {
   }
 
   if (!response.ok) {
-    throw new Error(data.message || `API request failed with status ${response.status}`);
+    const error = new Error(data.message || `API request failed with status ${response.status}`);
+    error.status = response.status;
+    error.data = data;
+    throw error;
   }
 
   return data;
