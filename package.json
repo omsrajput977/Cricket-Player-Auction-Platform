@@ -4,7 +4,7 @@
   "description": "Full-Stack Real-Time Cricket Player Auction Platform (MERN + Socket.io)",
   "private": true,
   "scripts": {
-    "build": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
+    "build": "npm install --include=dev --prefix backend && npm install --include=dev --prefix frontend && npm run build --prefix frontend",
     "start": "node backend/src/index.js",
     "backend": "npm start --prefix backend",
     "frontend": "npm run dev --prefix frontend"
