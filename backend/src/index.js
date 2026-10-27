@@ -3,6 +3,9 @@ import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { connectDB } from './config/db.js';
 
 import authRoutes from './routes/authRoutes.js';
@@ -14,9 +17,12 @@ import publicRoutes from './routes/publicRoutes.js';
 // Socket handlers
 import { registerAuctionSocketHandlers } from './sockets/auctionSocket.js';
 
-
 // Load environment variables
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendDist = path.resolve(__dirname, '../../frontend/dist');
 
 const app = express();
 const server = http.createServer(app);
@@ -58,15 +64,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Root API Welcome
-app.get('/', (req, res) => {
-  res.json({
-    message: '🏏 CricAuction Live Real-Time MERN Backend is running.',
-    version: '1.0.0',
-    documentation: '/api/health',
-  });
-});
-
 // REST API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/tournaments', tournamentRoutes);
@@ -75,8 +72,28 @@ app.use('/api/players', playerRoutes);
 app.use('/api/public', publicRoutes);
 
 // Register Real-Time Socket.io Handlers
-
 registerAuctionSocketHandlers(io);
+
+// Production All-In-One Deployment: Serve frontend build if dist folder exists
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+  console.log('📦 Serving production frontend build from:', frontendDist);
+} else {
+  // Root API Welcome for standalone backend development
+  app.get('/', (req, res) => {
+    res.json({
+      message: '🏏 CricAuction Live Real-Time MERN Backend is running.',
+      version: '1.0.0',
+      documentation: '/api/health',
+    });
+  });
+}
 
 // Centralized Error Handling Middleware
 app.use((err, req, res, next) => {
