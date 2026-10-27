@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: cricauction
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5010
+      - key: MONGODB_URI
+        value: mongodb+srv://omsrajput977_db_user:yzcTJsmYZboKa6at@cluster0.cysn0eq.mongodb.net/cricauction?retryWrites=true&w=majority
+      - key: JWT_SECRET
+        value: cricauction_super_secret_jwt_key_2026
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: ADMIN_REGISTRATION_KEY
+        value: CRIC_ADMIN_2026
+      - key: CLOUDINARY_CLOUD_NAME
+        value: qsrvpmvw
+      - key: CLOUDINARY_API_KEY
+        value: 277471115449474
+      - key: CLOUDINARY_API_SECRET
+        value: BvoMB3-mN3h-62w-f7ny-uqzuKE
