@@ -31,34 +31,42 @@ export const uploadToCloudinary = async (buffer, options = {}) => {
     return { url: '', publicId: '' };
   }
 
-  // If Cloudinary credentials are provided, upload directly via stream
+  // If Cloudinary credentials are provided, attempt stream upload
   if (isCloudinaryConfigured) {
-    return new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: options.folder || 'cricauction/players',
-          transformation: [
+    try {
+      const isProof = options.folder && options.folder.includes('proofs');
+      const transformations = isProof
+        ? [{ max_width: 1200, crop: 'limit' }, { quality: 'auto' }]
+        : [
             { width: 500, height: 500, crop: 'fill', gravity: 'face' },
             { quality: 'auto', fetch_format: 'webp' },
-          ],
-        },
-        (error, result) => {
-          if (error) {
-            console.error('Cloudinary stream upload error:', error);
-            return reject(new Error('Cloudinary upload failed: ' + error.message));
-          }
-          resolve({
-            url: result.secure_url,
-            publicId: result.public_id,
-          });
-        }
-      );
+          ];
 
-      uploadStream.end(buffer);
-    });
+      const result = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: options.folder || 'cricauction/players',
+            transformation: transformations,
+          },
+          (error, res) => {
+            if (error) return reject(error);
+            resolve(res);
+          }
+        );
+        uploadStream.end(buffer);
+      });
+
+      return {
+        url: result.secure_url,
+        publicId: result.public_id,
+      };
+    } catch (error) {
+      console.warn('⚠️ Cloudinary upload encountered an issue, falling back to Data URI:', error.message);
+      // Fall through to Data URI fallback below
+    }
   }
 
-  // Fallback: Encode as Data URI so local dev works without mandatory Cloudinary signup
+  // Fallback: Encode as Data URI so local dev & testing works reliably without Cloudinary issues
   const mimeType = options.mimetype || 'image/jpeg';
   const base64Data = buffer.toString('base64');
   const dataUri = `data:${mimeType};base64,${base64Data}`;

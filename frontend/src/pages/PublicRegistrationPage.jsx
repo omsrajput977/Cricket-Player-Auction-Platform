@@ -64,6 +64,14 @@ export const PublicRegistrationPage = ({ tournaments, activeTournament, setActiv
       return;
     }
 
+    if (!idCardFile) {
+      setFeedback({
+        error: 'Student College ID Card photo is compulsory. Please attach a photo of your physical student ID card.',
+        success: null,
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -442,22 +450,24 @@ export const PublicRegistrationPage = ({ tournaments, activeTournament, setActiv
               </div>
 
               {/* Student ID Card Proof */}
-              <div className="bg-stadium-surface/40 p-4 rounded-xl border border-cricket-gold/30 space-y-3">
+              <div className="bg-stadium-surface/40 p-4 rounded-xl border border-rose-500/40 space-y-3">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold uppercase text-cricket-gold">
-                      Student ID Card Proof (Anti-Spam)
+                    <label className="block text-xs font-bold uppercase text-white">
+                      College ID Card Proof * <span className="text-rose-400 font-extrabold">(COMPULSORY)</span>
                     </label>
-                    <span className="text-[10px] bg-cricket-gold/20 text-cricket-gold px-1.5 py-0.2 rounded font-extrabold">VERIFICATION</span>
+                    <span className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2 py-0.5 rounded font-black tracking-wider uppercase">
+                      MANDATORY
+                    </span>
                   </div>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleIdCardChange}
-                    className="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-stadium-card file:text-cricket-gold hover:file:bg-slate-700 cursor-pointer"
+                    className="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-rose-500/20 file:text-rose-300 hover:file:bg-rose-500/30 cursor-pointer"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    Upload physical college ID card or admission slip to prove your enrollment. Reviewed confidentially by organizers.
+                  <p className="text-[11px] text-rose-300/80 mt-1.5 font-medium">
+                    * Required: Attach an official student ID card photo or institutional admission slip. Nominations without valid ID proof will not be accepted.
                   </p>
                 </div>
 

@@ -49,11 +49,22 @@ export const registerPublicPlayer = async (req, res, next) => {
 
     // 2. Mobile Number format validation (10-digit Indian standard)
     const trimmedContact = (contactNumber || '').trim();
-    if (trimmedContact && !/^[6-9]\d{9}$/.test(trimmedContact)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid contact number. Must be a valid 10-digit mobile number.',
-      });
+    if (trimmedContact) {
+      if (!/^[6-9]\d{9}$/.test(trimmedContact)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid contact number. Must be a valid 10-digit mobile number.',
+        });
+      }
+
+      // Check duplicate mobile number in this tournament to prevent one person spamming multiple accounts
+      const existingPhone = await Player.findOne({ tournamentId, contactNumber: trimmedContact });
+      if (existingPhone) {
+        return res.status(400).json({
+          success: false,
+          message: `A player nomination has already been registered with mobile number "${trimmedContact}". Each student must register with their own phone number.`,
+        });
+      }
     }
 
     // 3. Check duplicate roll number
@@ -65,23 +76,27 @@ export const registerPublicPlayer = async (req, res, next) => {
       });
     }
 
-    // 4. Process Player Photo upload via Cloudinary
+    // 4. Compulsory Student College ID Card Proof Upload
+    const idCardFile = req.files?.['idCardProof']?.[0];
+    if (!idCardFile) {
+      return res.status(400).json({
+        success: false,
+        message: 'Student College ID Card photo is compulsory for tournament verification. Please upload a clear photo of your student ID card.',
+      });
+    }
+
+    let idCardProofData = await uploadToCloudinary(idCardFile.buffer, {
+      folder: `cricauction/proofs/${tournamentId}`,
+      mimetype: idCardFile.mimetype,
+    });
+
+    // 5. Process Optional Player Photo upload via Cloudinary
     let photoData = { url: '', publicId: '' };
     const photoFile = req.files?.['photo']?.[0] || req.file;
     if (photoFile) {
       photoData = await uploadToCloudinary(photoFile.buffer, {
         folder: `cricauction/players/${tournamentId}`,
         mimetype: photoFile.mimetype,
-      });
-    }
-
-    // 5. Process Student College ID Card Proof upload via Cloudinary
-    let idCardProofData = { url: '', publicId: '' };
-    const idCardFile = req.files?.['idCardProof']?.[0];
-    if (idCardFile) {
-      idCardProofData = await uploadToCloudinary(idCardFile.buffer, {
-        folder: `cricauction/proofs/${tournamentId}`,
-        mimetype: idCardFile.mimetype,
       });
     }
 
