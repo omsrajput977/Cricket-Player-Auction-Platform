@@ -93,6 +93,12 @@ export const AdminAuctionControls = ({
     setTimeout(() => setActionLoading(false), 1500);
   };
 
+  const handleUnloadPodium = () => {
+    if (!socket || !activePlayer) return;
+    setAdminError(null);
+    socket.emit('ADMIN_UNLOAD_PODIUM', { tournamentId });
+  };
+
   const handleFallbackBid = () => {
     if (!socket || !selectedFallbackTeamId || !activePlayer) return;
     setActionLoading(true);
@@ -154,10 +160,21 @@ export const AdminAuctionControls = ({
               onClick={handleLoadPlayer}
               disabled={!selectedPlayerId}
               className="px-4 py-2.5 rounded-xl font-bold text-xs bg-cricket-cyan hover:bg-cyan-400 text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shrink-0"
+              title="Push player to podium (returns any previous player to the queue)"
             >
               <UserPlus className="w-4 h-4" />
               <span>Push</span>
             </button>
+            {activePlayer && (
+              <button
+                onClick={handleUnloadPodium}
+                className="px-3 py-2.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 transition-all flex items-center gap-1.5 shrink-0"
+                title="Unload current player and return them back to the selection queue"
+              >
+                <RotateCcw className="w-4 h-4 text-amber-400" />
+                <span>Unload</span>
+              </button>
+            )}
           </div>
         </div>
 

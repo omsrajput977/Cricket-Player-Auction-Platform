@@ -75,6 +75,19 @@ export const LiveRoomPage = ({ activeTournament }) => {
       setEndsAt(0);
       setNextBidAmount(data.nextBidAmount);
       setRecentBids([]);
+      fetchTournamentPlayers();
+    });
+
+    // 3b. Player Returned to Queue (Unloaded from Podium)
+    socket.on('PLAYER_RETURNED_TO_QUEUE', () => {
+      setActivePlayer(null);
+      setCurrentHighestBid(0);
+      setCurrentBidderTeamId(null);
+      setStatus('IDLE');
+      setTimerRunning(false);
+      setEndsAt(0);
+      setRecentBids([]);
+      fetchTournamentPlayers();
     });
 
     // 4. Bidding Timer Started
@@ -169,6 +182,7 @@ export const LiveRoomPage = ({ activeTournament }) => {
     return () => {
       socket.off('ROOM_STATE_SYNC');
       socket.off('PLAYER_ON_PODIUM');
+      socket.off('PLAYER_RETURNED_TO_QUEUE');
       socket.off('BIDDING_STARTED');
       socket.off('TIMER_SYNC');
       socket.off('TIMER_PAUSED');

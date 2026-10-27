@@ -160,6 +160,18 @@ export class TournamentEngine {
       } catch (recoveryErr) {
         console.error('⚠️ Failed to rehydrate active auction session:', recoveryErr.message);
       }
+
+      // Revert any other player in ON_PODIUM status to APPROVED
+      await Player.updateMany(
+        { tournamentId: this.tournamentId, status: 'ON_PODIUM', _id: { $ne: savedSession.activePlayerId } },
+        { $set: { status: 'APPROVED' } }
+      );
+    } else {
+      // No active player on podium: revert all ON_PODIUM players back to APPROVED
+      await Player.updateMany(
+        { tournamentId: this.tournamentId, status: 'ON_PODIUM' },
+        { $set: { status: 'APPROVED' } }
+      );
     }
   }
 

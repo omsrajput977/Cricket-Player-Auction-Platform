@@ -143,7 +143,32 @@ export const bulkImportPlayers = async (req, res, next) => {
 export const getTournamentPlayers = async (req, res, next) => {
   try {
     const { status, role, categorySet, auctionRound } = req.query;
-    const filter = { tournamentId: req.params.tournamentId };
+    const tournamentId = req.params.tournamentId;
+
+    // Self-Healing: Ensure there can only ever be at most ONE player with status 'ON_PODIUM'.
+    // Any orphan 'ON_PODIUM' player not actively in the tournament session is returned to 'APPROVED'.
+    try {
+      const tournament = await Tournament.findById(tournamentId).select('activeAuctionSession');
+      const activePlayerId = tournament?.activeAuctionSession?.activePlayerId
+        ? tournament.activeAuctionSession.activePlayerId.toString()
+        : null;
+
+      if (activePlayerId) {
+        await Player.updateMany(
+          { tournamentId, status: 'ON_PODIUM', _id: { $ne: activePlayerId } },
+          { $set: { status: 'APPROVED' } }
+        );
+      } else {
+        await Player.updateMany(
+          { tournamentId, status: 'ON_PODIUM' },
+          { $set: { status: 'APPROVED' } }
+        );
+      }
+    } catch (healErr) {
+      console.warn('Orphan podium healing skipped:', healErr.message);
+    }
+
+    const filter = { tournamentId };
 
     if (status) filter.status = status;
     if (role) filter.role = role;

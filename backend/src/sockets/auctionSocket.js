@@ -117,6 +117,13 @@ export const registerAuctionSocketHandlers = (io) => {
           }
 
           engine.clearTimerTimeout();
+
+          // 1. Revert previous podium player(s) back to APPROVED so they return to the selection queue
+          await Player.updateMany(
+            { tournamentId, status: 'ON_PODIUM', _id: { $ne: player._id } },
+            { $set: { status: 'APPROVED' } }
+          );
+
           engine.session.activePlayer = player;
           engine.session.currentHighestBid = 0;
           engine.session.currentBidderTeamId = null;
@@ -127,7 +134,7 @@ export const registerAuctionSocketHandlers = (io) => {
           engine.session.timerRunning = false;
           engine.session.snapshotVersion += 1;
 
-          // Update player status
+          // Update new player status
           player.status = 'ON_PODIUM';
           await player.save();
 
@@ -142,6 +149,80 @@ export const registerAuctionSocketHandlers = (io) => {
         });
       } catch (err) {
         console.error('ADMIN_LOAD_PLAYER error:', err.message);
+        socket.emit('ERROR', { message: err.message });
+      }
+    });
+
+    /**
+     * ADMIN_UNLOAD_PODIUM
+     * Returns the active player from the podium back to the selection queue ('APPROVED')
+     * without marking them as UNSOLD or SOLD.
+     */
+    socket.on('ADMIN_UNLOAD_PODIUM', async ({ tournamentId }) => {
+      try {
+        if (socket.data.user.role !== 'ADMIN') {
+          return socket.emit('ERROR', { message: 'Forbidden: Admin role required.' });
+        }
+
+        const engine = await getTournamentEngine(tournamentId);
+
+        await engine.mutex.runExclusive(async () => {
+          const session = engine.session;
+          if (!session.activePlayer) {
+            return socket.emit('ERROR', { message: 'No player on the podium to return.' });
+          }
+
+          if (session.isFinalizing) return;
+
+          engine.clearTimerTimeout();
+
+          const activePlayerId = session.activePlayer._id;
+          const nextVersion = session.snapshotVersion + 1;
+
+          // Revert active player (and any orphan ON_PODIUM players) back to APPROVED
+          const revertedPlayer = await Player.findByIdAndUpdate(
+            activePlayerId,
+            { status: 'APPROVED' },
+            { new: true }
+          );
+
+          await Player.updateMany(
+            { tournamentId, status: 'ON_PODIUM' },
+            { $set: { status: 'APPROVED' } }
+          );
+
+          // Clear Tournament snapshot in DB
+          await Tournament.findByIdAndUpdate(tournamentId, {
+            $set: {
+              'activeAuctionSession.activePlayerId': null,
+              'activeAuctionSession.currentHighestBid': 0,
+              'activeAuctionSession.currentBidderTeamId': null,
+              'activeAuctionSession.currentBidderUserId': null,
+              'activeAuctionSession.endsAt': 0,
+              'activeAuctionSession.status': 'IDLE',
+              'activeAuctionSession.snapshotVersion': nextVersion,
+            },
+          });
+
+          // Reset In-Memory Session
+          session.activePlayer = null;
+          session.currentHighestBid = 0;
+          session.currentBidderTeamId = null;
+          session.currentBidderUserId = null;
+          session.endsAt = 0;
+          session.remainingMs = 0;
+          session.timerRunning = false;
+          session.status = 'IDLE';
+          session.snapshotVersion = nextVersion;
+
+          console.log(`↩️ PODIUM UNLOADED: ${revertedPlayer?.name} returned to available auction queue.`);
+
+          io.to(tournamentId).emit('PLAYER_RETURNED_TO_QUEUE', {
+            player: revertedPlayer,
+          });
+        });
+      } catch (err) {
+        console.error('ADMIN_UNLOAD_PODIUM error:', err.message);
         socket.emit('ERROR', { message: err.message });
       }
     });
