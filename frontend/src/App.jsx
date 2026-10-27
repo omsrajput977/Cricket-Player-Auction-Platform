@@ -5,6 +5,8 @@ import { Navbar } from './components/Navbar';
 import { LiveRoomPage } from './pages/LiveRoomPage';
 import { AdminSetupPage } from './pages/AdminSetupPage';
 import { LoginPage } from './pages/LoginPage';
+import { PublicRegistrationPage } from './pages/PublicRegistrationPage';
+import { PublicLookupPage } from './pages/PublicLookupPage';
 
 export default function App() {
   const { user, isAdmin } = useAuth();
@@ -45,6 +47,19 @@ export default function App() {
       <main className="flex-1">
         {activeView === 'login' ? (
           <LoginPage onLoginSuccess={() => setActiveView('live-room')} />
+        ) : activeView === 'nominate' ? (
+          <PublicRegistrationPage
+            tournaments={tournaments}
+            activeTournament={activeTournament}
+            setActiveTournament={setActiveTournament}
+            onSuccessRedirect={() => setActiveView('lookup')}
+          />
+        ) : activeView === 'lookup' ? (
+          <PublicLookupPage
+            tournaments={tournaments}
+            activeTournament={activeTournament}
+            setActiveTournament={setActiveTournament}
+          />
         ) : activeView === 'admin-setup' ? (
           <AdminSetupPage
             activeTournament={activeTournament}
@@ -58,6 +73,7 @@ export default function App() {
           <LiveRoomPage activeTournament={activeTournament} />
         )}
       </main>
+
 
       <footer className="glass-panel border-t border-stadium-border/60 py-4 px-6 text-center text-xs text-slate-500">
         <p>

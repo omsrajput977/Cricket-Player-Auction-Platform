@@ -5,14 +5,15 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDB } from './config/db.js';
 
-// Route imports
 import authRoutes from './routes/authRoutes.js';
 import tournamentRoutes from './routes/tournamentRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
 import playerRoutes from './routes/playerRoutes.js';
+import publicRoutes from './routes/publicRoutes.js';
 
 // Socket handlers
 import { registerAuctionSocketHandlers } from './sockets/auctionSocket.js';
+
 
 // Load environment variables
 dotenv.config();
@@ -68,8 +69,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/players', playerRoutes);
+app.use('/api/public', publicRoutes);
 
 // Register Real-Time Socket.io Handlers
+
 registerAuctionSocketHandlers(io);
 
 // Centralized Error Handling Middleware

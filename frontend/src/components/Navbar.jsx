@@ -51,10 +51,10 @@ export const Navbar = ({ activeView, setActiveView, tournaments, activeTournamen
         )}
 
         {/* Navigation & User Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => setActiveView('live-room')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
               activeView === 'live-room'
                 ? 'bg-cricket-cyan/20 text-cricket-cyan border border-cricket-cyan/30'
                 : 'text-slate-400 hover:text-white'
@@ -64,12 +64,34 @@ export const Navbar = ({ activeView, setActiveView, tournaments, activeTournamen
             <span>Live Stage</span>
           </button>
 
+          <button
+            onClick={() => setActiveView('nominate')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+              activeView === 'nominate'
+                ? 'bg-cricket-cyan/20 text-cricket-cyan border border-cricket-cyan/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <span>Nominate</span>
+          </button>
+
+          <button
+            onClick={() => setActiveView('lookup')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+              activeView === 'lookup'
+                ? 'bg-cricket-cyan/20 text-cricket-cyan border border-cricket-cyan/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <span>Roll Lookup</span>
+          </button>
+
           {isAdmin && (
             <button
               onClick={() => setActiveView('admin-setup')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                 activeView === 'admin-setup'
-                  ? 'bg-cricket-cyan/20 text-cricket-cyan border border-cricket-cyan/30'
+                  ? 'bg-cricket-gold/20 text-cricket-gold border border-cricket-gold/30'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -77,6 +99,7 @@ export const Navbar = ({ activeView, setActiveView, tournaments, activeTournamen
               <span>Admin Console</span>
             </button>
           )}
+
 
           {user ? (
             <div className="flex items-center gap-2 pl-2 border-l border-stadium-border">

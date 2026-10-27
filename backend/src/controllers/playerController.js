@@ -241,3 +241,91 @@ export const updatePlayer = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Recall Unsold Players into Round 2 Accelerated (Admin Only)
+ * POST /api/players/recall-unsold
+ */
+export const recallUnsoldPlayers = async (req, res, next) => {
+  try {
+    const { tournamentId, playerIds, discountPercent } = req.body;
+
+    if (!tournamentId) {
+      return res.status(400).json({
+        success: false,
+        message: 'TournamentId is required.',
+      });
+    }
+
+    const tournament = await Tournament.findById(tournamentId);
+    if (!tournament) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tournament not found.',
+      });
+    }
+
+    const query = {
+      tournamentId,
+      status: 'UNSOLD',
+    };
+
+    if (Array.isArray(playerIds) && playerIds.length > 0) {
+      query._id = { $in: playerIds };
+    }
+
+    const unsoldPlayers = await Player.find(query);
+
+    if (unsoldPlayers.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'No unsold players match the criteria to recall.',
+        count: 0,
+        data: [],
+      });
+    }
+
+    const minBase = tournament.settings.minBasePrice || 20000;
+    const discount = Number(discountPercent) || 0;
+
+    const bulkOps = unsoldPlayers.map((player) => {
+      let newBasePrice = player.basePrice;
+      if (discount > 0) {
+        newBasePrice = Math.max(minBase, Math.round(player.basePrice * (1 - discount / 100)));
+      }
+
+      return {
+        updateOne: {
+          filter: { _id: player._id },
+          update: {
+            $set: {
+              status: 'APPROVED',
+              auctionRound: 'ROUND_2_ACCELERATED',
+              basePrice: newBasePrice,
+            },
+          },
+        },
+      };
+    });
+
+    await Player.bulkWrite(bulkOps);
+
+    // Switch tournament currentRound to ROUND_2_ACCELERATED
+    tournament.currentRound = 'ROUND_2_ACCELERATED';
+    await tournament.save();
+
+    const recalled = await Player.find(query._id ? { _id: { $in: playerIds } } : { tournamentId, auctionRound: 'ROUND_2_ACCELERATED' });
+
+    console.log(`🔄 [ROUND 2] Recalled ${recalled.length} unsold players into ROUND_2_ACCELERATED (Discount: ${discount}%)`);
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully recalled ${recalled.length} players into Round 2 Accelerated!`,
+      count: recalled.length,
+      data: recalled,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

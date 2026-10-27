@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../utils/api';
 import { Trophy, Shield, Users, UserPlus, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import { UnsoldRecallDrawer } from '../components/UnsoldRecallDrawer';
+
 
 export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTournamentCreated }) => {
   const [teams, setTeams] = useState([]);
@@ -462,9 +464,19 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTourna
         </div>
       </div>
 
+      {/* Round 2 Accelerated: Unsold Recall Drawer */}
+      {activeTournament && (
+        <UnsoldRecallDrawer
+          tournamentId={activeTournament._id}
+          players={players}
+          onRecalled={loadTournamentData}
+        />
+      )}
+
       {/* Players Section & Bulk Seed */}
       <div className="glass-panel rounded-2xl p-6 border border-stadium-border/60">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-stadium-border/60 mb-6">
+
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-emerald-400" />
             <h2 className="font-extrabold text-lg text-white">
