@@ -1,6 +1,7 @@
 # 🏏 CricAuction — Real-Time Collegiate Cricket Player Auction Platform
 
 [![Tech Stack](https://img.shields.io/badge/Stack-MERN%20%2B%20Socket.io-blue.svg)](https://github.com/omsrajput977/Cricket-Player-Auction-Platform)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-brightgreen.svg)](https://cricauction-7eww.onrender.com/)
 [![Node](https://img.shields.io/badge/Node.js-v18%2B-green.svg)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/React-18-cyan.svg)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Bundler-Vite%206-purple.svg)](https://vitejs.dev/)
@@ -17,7 +18,7 @@ CricAuction replaces chaotic paper-based auctions and spreadsheet bidding with a
 
 | Resource | Link |
 | :--- | :--- |
-| 🌐 **Live Deployed Application** | [👉 Launch Live CricAuction Application](https://your-deployed-link-here.com) *(Replace with your live deployment URL)* |
+| 🌐 **Live Deployed Application** | [👉 https://cricauction-7eww.onrender.com](https://cricauction-7eww.onrender.com/) |
 | 🎥 **Project Explanation & Walkthrough Video** | [👉 Watch Comprehensive Video Demonstration](https://your-video-link-here.com) *(Replace with your video explanation URL)* |
 
 ---
