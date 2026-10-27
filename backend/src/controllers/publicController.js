@@ -39,7 +39,24 @@ export const registerPublicPlayer = async (req, res, next) => {
 
     const upperRoll = rollNumber.trim().toUpperCase();
 
-    // Check duplicate roll number
+    // 1. Roll Number strict format validation (Alphanumeric with hyphens/underscores, 3-20 chars)
+    if (upperRoll.length < 3 || upperRoll.length > 20 || !/^[A-Z0-9\-_]+$/.test(upperRoll)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid roll number format. Must be alphanumeric (e.g., CS23-01, ME22-15).',
+      });
+    }
+
+    // 2. Mobile Number format validation (10-digit Indian standard)
+    const trimmedContact = (contactNumber || '').trim();
+    if (trimmedContact && !/^[6-9]\d{9}$/.test(trimmedContact)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid contact number. Must be a valid 10-digit mobile number.',
+      });
+    }
+
+    // 3. Check duplicate roll number
     const existing = await Player.findOne({ tournamentId, rollNumber: upperRoll });
     if (existing) {
       return res.status(400).json({
@@ -48,12 +65,23 @@ export const registerPublicPlayer = async (req, res, next) => {
       });
     }
 
-    // Process photo upload via Cloudinary or fallback
+    // 4. Process Player Photo upload via Cloudinary
     let photoData = { url: '', publicId: '' };
-    if (req.file) {
-      photoData = await uploadToCloudinary(req.file.buffer, {
+    const photoFile = req.files?.['photo']?.[0] || req.file;
+    if (photoFile) {
+      photoData = await uploadToCloudinary(photoFile.buffer, {
         folder: `cricauction/players/${tournamentId}`,
-        mimetype: req.file.mimetype,
+        mimetype: photoFile.mimetype,
+      });
+    }
+
+    // 5. Process Student College ID Card Proof upload via Cloudinary
+    let idCardProofData = { url: '', publicId: '' };
+    const idCardFile = req.files?.['idCardProof']?.[0];
+    if (idCardFile) {
+      idCardProofData = await uploadToCloudinary(idCardFile.buffer, {
+        folder: `cricauction/proofs/${tournamentId}`,
+        mimetype: idCardFile.mimetype,
       });
     }
 
@@ -82,8 +110,9 @@ export const registerPublicPlayer = async (req, res, next) => {
       rollNumber: upperRoll,
       department: department.trim(),
       year: year.trim(),
-      contactNumber: (contactNumber || '').trim(),
+      contactNumber: trimmedContact,
       photo: photoData,
+      idCardProof: idCardProofData,
       role,
       battingStyle: battingStyle || 'RIGHT_HAND',
       bowlingStyle: bowlingStyle || 'NONE',
@@ -96,7 +125,7 @@ export const registerPublicPlayer = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: 'Player registration submitted successfully! Your application is pending organizer verification.',
+      message: 'Player nomination submitted successfully! Your application is pending organizer verification.',
       data: {
         id: player._id,
         name: player.name,
@@ -105,6 +134,7 @@ export const registerPublicPlayer = async (req, res, next) => {
         role: player.role,
         status: player.status,
         photoUrl: player.photo?.url || '',
+        idCardProofUrl: player.idCardProof?.url || '',
       },
     });
   } catch (error) {
@@ -158,6 +188,8 @@ export const lookupPlayerByRoll = async (req, res, next) => {
         auctionRound: player.auctionRound,
         status: player.status,
         photoUrl: player.photo?.url || '',
+        idCardProofUrl: player.idCardProof?.url || '',
+        rejectionReason: player.rejectionReason || '',
         soldTo: player.soldTo || null,
         soldPrice: player.soldPrice || 0,
         registeredAt: player.createdAt,

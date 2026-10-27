@@ -71,10 +71,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const registerAdmin = async (name, email, password) => {
+  const registerAdmin = async (name, email, password, adminSecretKey) => {
     const res = await apiRequest('/auth/register-admin', {
       method: 'POST',
-      body: { name, email, password },
+      body: { name, email, password, adminSecretKey },
     });
 
     if (res.success && res.data) {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Trophy, Shield, KeyRound, Mail, User, AlertCircle } from 'lucide-react';
+import { Trophy, Shield, KeyRound, Mail, User, AlertCircle, Lock } from 'lucide-react';
 
 export const LoginPage = ({ onLoginSuccess }) => {
   const { login, registerAdmin } = useAuth();
@@ -9,6 +9,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
     name: '',
     email: '',
     password: '',
+    adminSecretKey: '',
   });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -20,7 +21,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
 
     try {
       if (isRegistering) {
-        await registerAdmin(formData.name, formData.email, formData.password);
+        await registerAdmin(formData.name, formData.email, formData.password, formData.adminSecretKey);
       } else {
         await login(formData.email, formData.password);
       }
@@ -91,22 +92,47 @@ export const LoginPage = ({ onLoginSuccess }) => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {isRegistering && (
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="Tournament Organizer"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-stadium-surface border border-stadium-border text-white text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-cricket-cyan"
-                  />
+              <>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                    Full Name
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
+                    <input
+                      type="text"
+                      required
+                      placeholder="Tournament Organizer"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full bg-stadium-surface border border-stadium-border text-white text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-cricket-cyan"
+                    />
+                  </div>
                 </div>
-              </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-cricket-gold">
+                      Organizer Security Passcode
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-semibold">Faculty / Committee Only</span>
+                  </div>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-cricket-gold absolute left-3.5 top-3.5" />
+                    <input
+                      type="password"
+                      required
+                      placeholder="Enter committee master key"
+                      value={formData.adminSecretKey}
+                      onChange={(e) => setFormData({ ...formData, adminSecretKey: e.target.value })}
+                      className="w-full bg-stadium-surface border border-cricket-gold/40 text-white text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-cricket-gold shadow-sm shadow-amber-950/20"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Protects the tournament against unauthorized registrations. Default: <code className="text-cricket-gold font-mono">CRIC_ADMIN_2026</code>
+                  </p>
+                </div>
+              </>
             )}
 
             <div>

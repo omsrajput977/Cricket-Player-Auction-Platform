@@ -22,6 +22,8 @@ export const PublicRegistrationPage = ({ tournaments, activeTournament, setActiv
 
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [idCardFile, setIdCardFile] = useState(null);
+  const [idCardPreview, setIdCardPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState({ error: null, success: null });
 
@@ -35,6 +37,20 @@ export const PublicRegistrationPage = ({ tournaments, activeTournament, setActiv
       setPhotoFile(file);
       const reader = new FileReader();
       reader.onloadend = () => setPhotoPreview(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleIdCardChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setFeedback({ error: 'ID Card file size exceeds 5MB limit.', success: null });
+        return;
+      }
+      setIdCardFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setIdCardPreview(reader.result);
       reader.readAsDataURL(file);
     }
   };
@@ -75,6 +91,9 @@ export const PublicRegistrationPage = ({ tournaments, activeTournament, setActiv
 
       if (photoFile) {
         data.append('photo', photoFile);
+      }
+      if (idCardFile) {
+        data.append('idCardProof', idCardFile);
       }
 
       const response = await fetch('/api/public/players/register', {
@@ -384,40 +403,78 @@ export const PublicRegistrationPage = ({ tournaments, activeTournament, setActiv
             </div>
           </div>
 
-          {/* Photo Upload & Base Price */}
+          {/* Photo & Verification Proof */}
           <div className="space-y-4 pt-4 border-t border-stadium-border/60">
             <h3 className="text-sm font-extrabold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
               <Upload className="w-4 h-4" />
-              <span>3. Photo & Base Valuation</span>
+              <span>3. Photo & College Identity Verification</span>
             </h3>
 
-            <div className="grid sm:grid-cols-2 gap-6 items-center">
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
-                  Profile Photo (Cloudinary CDN)
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-stadium-surface file:text-cricket-cyan hover:file:bg-slate-700 cursor-pointer"
-                />
-                <p className="text-[11px] text-slate-500 mt-1">Accepts JPG, PNG, WEBP up to 5MB.</p>
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Profile Photo */}
+              <div className="bg-stadium-surface/40 p-4 rounded-xl border border-stadium-border/60 space-y-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-200 mb-1">
+                    Profile Picture (Live Stage Display)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-stadium-card file:text-cricket-cyan hover:file:bg-slate-700 cursor-pointer"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">Clear headshot for the live auction screen (JPG/PNG/WEBP up to 5MB).</p>
+                </div>
+
+                {photoPreview && (
+                  <div className="flex items-center gap-3 bg-stadium-card p-2.5 rounded-lg border border-stadium-border">
+                    <img
+                      src={photoPreview}
+                      alt="Preview"
+                      className="w-14 h-14 rounded-lg object-cover border border-cricket-cyan/40"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-white block">Profile Photo Loaded</span>
+                      <span className="text-[10px] text-emerald-400 font-medium">Ready for CDN sync</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {photoPreview && (
-                <div className="flex items-center gap-3 bg-stadium-surface p-3 rounded-xl border border-stadium-border">
-                  <img
-                    src={photoPreview}
-                    alt="Preview"
-                    className="w-16 h-16 rounded-lg object-cover border border-cricket-cyan/40"
-                  />
-                  <div>
-                    <span className="text-xs font-bold text-white block">Preview Loaded</span>
-                    <span className="text-[11px] text-slate-400">Ready for CDN upload</span>
+              {/* Student ID Card Proof */}
+              <div className="bg-stadium-surface/40 p-4 rounded-xl border border-cricket-gold/30 space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase text-cricket-gold">
+                      Student ID Card Proof (Anti-Spam)
+                    </label>
+                    <span className="text-[10px] bg-cricket-gold/20 text-cricket-gold px-1.5 py-0.2 rounded font-extrabold">VERIFICATION</span>
                   </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleIdCardChange}
+                    className="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-stadium-card file:text-cricket-gold hover:file:bg-slate-700 cursor-pointer"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Upload physical college ID card or admission slip to prove your enrollment. Reviewed confidentially by organizers.
+                  </p>
                 </div>
-              )}
+
+                {idCardPreview && (
+                  <div className="flex items-center gap-3 bg-stadium-card p-2.5 rounded-lg border border-cricket-gold/40">
+                    <img
+                      src={idCardPreview}
+                      alt="ID Proof Preview"
+                      className="w-14 h-14 rounded-lg object-cover border border-cricket-gold/40"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-white block">ID Card Proof Attached</span>
+                      <span className="text-[10px] text-cricket-gold font-medium">Ready for organizer verification</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

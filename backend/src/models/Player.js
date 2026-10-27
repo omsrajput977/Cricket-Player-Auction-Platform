@@ -45,6 +45,17 @@ const playerSchema = new mongoose.Schema(
         default: '',
       },
     },
+    // Student College ID Card Proof photo to deter spam nominations
+    idCardProof: {
+      url: {
+        type: String,
+        default: '',
+      },
+      publicId: {
+        type: String,
+        default: '',
+      },
+    },
     role: {
       type: String,
       required: [true, 'Playing role is required'],
@@ -117,6 +128,10 @@ const playerSchema = new mongoose.Schema(
     soldPrice: {
       type: Number,
       default: 0,
+    },
+    rejectionReason: {
+      type: String,
+      default: '',
     },
   },
   {

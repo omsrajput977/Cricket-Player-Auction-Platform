@@ -329,3 +329,100 @@ export const recallUnsoldPlayers = async (req, res, next) => {
   }
 };
 
+/**
+ * Approve a Player Nomination (Admin Only)
+ * PATCH /api/players/:id/approve
+ */
+export const approvePlayer = async (req, res, next) => {
+  try {
+    const { basePrice, categorySet, auctionRound } = req.body;
+    const player = await Player.findById(req.params.id);
+
+    if (!player) {
+      return res.status(404).json({ success: false, message: 'Player not found.' });
+    }
+
+    player.status = 'APPROVED';
+    if (basePrice !== undefined) player.basePrice = Number(basePrice);
+    if (categorySet) player.categorySet = categorySet;
+    if (auctionRound) player.auctionRound = auctionRound;
+    player.rejectionReason = '';
+
+    await player.save();
+
+    console.log(`✅ [APPROVED] Admin approved player "${player.name}" (${player.rollNumber}) at base ${player.basePrice} pts`);
+
+    res.status(200).json({
+      success: true,
+      message: `Nomination for "${player.name}" has been approved and enlisted into the auction!`,
+      data: player,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reject a Player Nomination (Admin Only)
+ * PATCH /api/players/:id/reject
+ */
+export const rejectPlayer = async (req, res, next) => {
+  try {
+    const { rejectionReason } = req.body;
+    const player = await Player.findById(req.params.id);
+
+    if (!player) {
+      return res.status(404).json({ success: false, message: 'Player not found.' });
+    }
+
+    if (player.status === 'SOLD') {
+      return res.status(400).json({ success: false, message: 'Cannot reject a player that has already been SOLD.' });
+    }
+
+    player.status = 'REJECTED';
+    player.rejectionReason = rejectionReason || 'Verification rejected by organizer (unverified ID card or invalid credentials).';
+
+    await player.save();
+
+    console.log(`❌ [REJECTED] Admin rejected nomination for "${player.name}" (${player.rollNumber}): ${player.rejectionReason}`);
+
+    res.status(200).json({
+      success: true,
+      message: `Nomination for "${player.name}" has been rejected.`,
+      data: player,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Permanently Delete / Purge Spam Player (Admin Only)
+ * DELETE /api/players/:id
+ */
+export const deletePlayer = async (req, res, next) => {
+  try {
+    const player = await Player.findById(req.params.id);
+
+    if (!player) {
+      return res.status(404).json({ success: false, message: 'Player not found.' });
+    }
+
+    if (player.status === 'SOLD') {
+      return res.status(400).json({ success: false, message: 'Cannot purge a player that has already been SOLD.' });
+    }
+
+    await Player.findByIdAndDelete(req.params.id);
+
+    console.log(`🗑️ [PURGED] Admin permanently deleted spam record "${player.name}" (${player.rollNumber})`);
+
+    res.status(200).json({
+      success: true,
+      message: `Nomination record for "${player.name}" was permanently purged.`,
+      data: { id: req.params.id },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

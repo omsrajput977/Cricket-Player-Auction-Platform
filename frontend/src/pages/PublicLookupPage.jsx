@@ -152,7 +152,22 @@ export const PublicLookupPage = ({ tournaments, activeTournament, setActiveTourn
                 <span>UNSOLD (ROUND 2 ELIGIBLE)</span>
               </span>
             )}
+            {playerData.status === 'REJECTED' && (
+              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                <XCircle className="w-3.5 h-3.5" />
+                <span>NOMINATION REJECTED</span>
+              </span>
+            )}
           </div>
+
+          {playerData.status === 'REJECTED' && (
+            <div className="mx-6 mt-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2.5">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>
+                <strong>Verification Decision:</strong> {playerData.rejectionReason || 'Nomination unverified by tournament committee.'}
+              </span>
+            </div>
+          )}
 
           {/* Profile Details */}
           <div className="p-6 sm:p-8 grid sm:grid-cols-12 gap-6 items-center">

@@ -1,14 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../utils/api';
-import { Trophy, Shield, Users, UserPlus, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import {
+  Trophy,
+  Shield,
+  Users,
+  UserPlus,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  Eye,
+  Check,
+  X,
+  Trash2,
+  ExternalLink,
+  FileCheck,
+  Phone,
+  ShieldAlert,
+  XCircle,
+  Search,
+} from 'lucide-react';
 import { UnsoldRecallDrawer } from '../components/UnsoldRecallDrawer';
-
 
 export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTournamentCreated }) => {
   const [teams, setTeams] = useState([]);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState({ type: null, message: null });
+  const [approvalSettings, setApprovalSettings] = useState({});
+  const [previewProofModal, setPreviewProofModal] = useState(null);
+  const [rejectReasonInput, setRejectReasonInput] = useState({});
 
   // Tournament creation form
   const [tournamentForm, setTournamentForm] = useState({
@@ -232,6 +252,72 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTourna
       setLoading(false);
     }
   };
+
+  // Approve a pending student nomination
+  const handleApproveNomination = async (player) => {
+    setLoading(true);
+    const custom = approvalSettings[player._id] || {};
+    try {
+      const res = await apiRequest(`/players/${player._id}/approve`, {
+        method: 'PATCH',
+        body: {
+          basePrice: custom.basePrice !== undefined ? Number(custom.basePrice) : player.basePrice,
+          categorySet: custom.categorySet || player.categorySet || 'SET_1',
+          auctionRound: 'ROUND_1',
+        },
+      });
+      if (res.success) {
+        notify('success', res.message);
+        loadTournamentData();
+      }
+    } catch (err) {
+      notify('error', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Reject a student nomination
+  const handleRejectNomination = async (playerId) => {
+    const reason = rejectReasonInput[playerId] || 'Physical ID proof unverified / invalid enrollment';
+    setLoading(true);
+    try {
+      const res = await apiRequest(`/players/${playerId}/reject`, {
+        method: 'PATCH',
+        body: { rejectionReason: reason },
+      });
+      if (res.success) {
+        notify('success', res.message);
+        loadTournamentData();
+      }
+    } catch (err) {
+      notify('error', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Permanently purge a spam player
+  const handlePurgePlayer = async (playerId, playerName) => {
+    if (!window.confirm(`Are you sure you want to permanently delete "${playerName}"? This cannot be undone.`)) return;
+    setLoading(true);
+    try {
+      const res = await apiRequest(`/players/${playerId}`, {
+        method: 'DELETE',
+      });
+      if (res.success) {
+        notify('success', res.message);
+        loadTournamentData();
+      }
+    } catch (err) {
+      notify('error', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pendingNominations = players.filter((p) => p.status === 'PENDING_APPROVAL');
+  const rosterPlayers = players.filter((p) => p.status !== 'PENDING_APPROVAL');
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
@@ -473,6 +559,196 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTourna
         />
       )}
 
+      {/* Student Nominations Verification Queue (Anti-Spam Gatekeeper) */}
+      <div className="glass-panel rounded-2xl p-6 border border-cricket-gold/40 bg-stadium-card/70 space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-stadium-border/60">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-cricket-gold/20 flex items-center justify-center text-cricket-gold border border-cricket-gold/40">
+              <FileCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-extrabold text-lg text-white">Student Nominations Verification Queue</h2>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-cricket-gold text-slate-950">
+                  {pendingNominations.length} Pending
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Review student identity proofs to filter out fake or spam submissions before they enter the auction.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {pendingNominations.length === 0 ? (
+          <div className="py-8 text-center text-slate-500 text-xs bg-stadium-surface/40 rounded-xl border border-stadium-border/40">
+            <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2 opacity-60" />
+            <span>All student nominations have been reviewed! Zero pending submissions.</span>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {pendingNominations.map((p) => {
+              const custom = approvalSettings[p._id] || {};
+              const currentCategory = custom.categorySet || p.categorySet || 'SET_1';
+              const currentBase = custom.basePrice !== undefined ? custom.basePrice : p.basePrice;
+
+              return (
+                <div
+                  key={p._id}
+                  className="p-4 rounded-xl bg-stadium-surface/60 border border-stadium-border hover:border-cricket-gold/50 transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                >
+                  {/* Student Details & Proof Thumbnails */}
+                  <div className="flex items-start sm:items-center gap-4 flex-1 min-w-0">
+                    {/* Photos */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Avatar */}
+                      <div
+                        onClick={() => p.photo?.url && setPreviewProofModal({ title: `${p.name} - Profile Photo`, url: p.photo.url })}
+                        className={`w-14 h-14 rounded-xl overflow-hidden border border-stadium-border bg-stadium-dark flex items-center justify-center ${
+                          p.photo?.url ? 'cursor-pointer hover:border-cricket-cyan' : ''
+                        }`}
+                        title="Click to view full photo"
+                      >
+                        {p.photo?.url ? (
+                          <img src={p.photo.url} alt={p.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <UserPlus className="w-6 h-6 text-slate-500" />
+                        )}
+                      </div>
+
+                      {/* ID Card Proof Thumbnail */}
+                      <div
+                        onClick={() =>
+                          p.idCardProof?.url &&
+                          setPreviewProofModal({ title: `${p.name} - College ID Card Proof`, url: p.idCardProof.url })
+                        }
+                        className={`w-14 h-14 rounded-xl overflow-hidden border flex flex-col items-center justify-center text-center p-1 ${
+                          p.idCardProof?.url
+                            ? 'border-cricket-gold/60 bg-cricket-gold/10 cursor-pointer hover:scale-105 transition-transform'
+                            : 'border-slate-800 bg-slate-900/50'
+                        }`}
+                        title={p.idCardProof?.url ? 'Click to inspect Student ID Card Proof' : 'No ID Card Attached'}
+                      >
+                        {p.idCardProof?.url ? (
+                          <img src={p.idCardProof.url} alt="ID Card Proof" className="w-full h-full object-cover rounded" />
+                        ) : (
+                          <span className="text-[9px] text-slate-500 font-bold uppercase leading-tight">No ID Proof</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Student Info */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="font-extrabold text-white text-base truncate">{p.name}</h4>
+                        <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-800 text-cricket-cyan border border-slate-700 font-bold">
+                          {p.rollNumber}
+                        </span>
+                        <span className="text-xs px-2 py-0.5 rounded bg-stadium-dark text-slate-300 font-medium">
+                          {p.department} • {p.year}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mt-1">
+                        <span className="text-emerald-400 font-semibold">{p.role.replace(/_/g, ' ')}</span>
+                        {p.contactNumber && (
+                          <span className="flex items-center gap-1 text-slate-400 font-mono">
+                            <Phone className="w-3 h-3 text-slate-500" />
+                            {p.contactNumber}
+                          </span>
+                        )}
+                        <span>
+                          Stats: <strong>{p.stats?.matchesPlayed || 0}</strong> matches, <strong>{p.stats?.runsScored || 0}</strong> runs, <strong>{p.stats?.wicketsTaken || 0}</strong> wkts
+                        </span>
+                      </div>
+
+                      {p.idCardProof?.url && (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewProofModal({ title: `${p.name} - College ID Card Proof`, url: p.idCardProof.url })}
+                          className="mt-1 text-[11px] font-bold text-cricket-gold hover:underline flex items-center gap-1"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>Inspect Student ID Card Proof</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Pricing / Category Adjustment & Moderation Actions */}
+                  <div className="flex flex-wrap items-center gap-3 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-stadium-border/60">
+                    <div className="w-28">
+                      <label className="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Category</label>
+                      <select
+                        value={currentCategory}
+                        onChange={(e) =>
+                          setApprovalSettings({
+                            ...approvalSettings,
+                            [p._id]: { ...custom, categorySet: e.target.value },
+                          })
+                        }
+                        className="w-full bg-stadium-card border border-stadium-border rounded-lg px-2 py-1.5 text-xs text-white"
+                      >
+                        <option value="MARQUEE">Marquee</option>
+                        <option value="SET_1">Set 1</option>
+                        <option value="SET_2">Set 2</option>
+                        <option value="SET_3">Set 3</option>
+                      </select>
+                    </div>
+
+                    <div className="w-28">
+                      <label className="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Base Price</label>
+                      <input
+                        type="number"
+                        value={currentBase}
+                        onChange={(e) =>
+                          setApprovalSettings({
+                            ...approvalSettings,
+                            [p._id]: { ...custom, basePrice: e.target.value },
+                          })
+                        }
+                        className="w-full bg-stadium-card border border-stadium-border rounded-lg px-2 py-1.5 text-xs text-white font-mono"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-3.5">
+                      <button
+                        onClick={() => handleApproveNomination(p)}
+                        disabled={loading}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 hover:brightness-110 shadow-md shadow-emerald-950 transition-all disabled:opacity-50"
+                        title="Approve student and enlist into auction pool"
+                      >
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        <span>Approve</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleRejectNomination(p._id)}
+                        disabled={loading}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 transition-all disabled:opacity-50"
+                        title="Reject nomination (fake proof / invalid details)"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Reject</span>
+                      </button>
+
+                      <button
+                        onClick={() => handlePurgePlayer(p._id, p.name)}
+                        disabled={loading}
+                        className="p-2 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 border border-stadium-border transition-all"
+                        title="Permanently purge record"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Players Section & Bulk Seed */}
       <div className="glass-panel rounded-2xl p-6 border border-stadium-border/60">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-stadium-border/60 mb-6">
@@ -480,7 +756,7 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTourna
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-emerald-400" />
             <h2 className="font-extrabold text-lg text-white">
-              Player Roster ({players.length} Registered)
+              Approved Auction Roster ({rosterPlayers.length} Enlisted)
             </h2>
           </div>
 
@@ -568,16 +844,25 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTourna
               </tr>
             </thead>
             <tbody className="divide-y divide-stadium-border/60">
-              {players.length === 0 ? (
+              {rosterPlayers.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="p-6 text-center text-slate-500">
-                    No players in roster. Use the quick form or click "Seed 10 College Cricket Stars".
+                  <td colSpan="8" className="p-6 text-center text-slate-500">
+                    No approved players in roster yet. Use the quick form, seed college stars, or approve student nominations above.
                   </td>
                 </tr>
               ) : (
-                players.map((p) => (
+                rosterPlayers.map((p) => (
                   <tr key={p._id} className="hover:bg-slate-800/40">
-                    <td className="p-3 font-bold text-white">{p.name}</td>
+                    <td className="p-3 font-bold text-white flex items-center gap-2">
+                      {p.photo?.url ? (
+                        <img src={p.photo.url} alt={p.name} className="w-6 h-6 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[10px] text-slate-400 font-bold shrink-0">
+                          {p.name.charAt(0)}
+                        </div>
+                      )}
+                      <span>{p.name}</span>
+                    </td>
                     <td className="p-3 font-mono text-slate-400">{p.rollNumber}</td>
                     <td className="p-3 text-cricket-cyan">{p.role.replace(/_/g, ' ')}</td>
                     <td className="p-3 font-mono font-bold text-white">{p.basePrice?.toLocaleString()} pts</td>
@@ -591,8 +876,11 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTourna
                             ? 'bg-rose-500/20 text-rose-400'
                             : p.status === 'ON_PODIUM'
                             ? 'bg-cricket-gold/20 text-cricket-gold'
-                            : 'bg-slate-800 text-slate-300'
+                            : p.status === 'REJECTED'
+                            ? 'bg-rose-900/30 text-rose-300 border border-rose-500/30'
+                            : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
                         }`}
+                        title={p.status === 'REJECTED' ? p.rejectionReason : ''}
                       >
                         {p.status}
                       </span>
@@ -602,8 +890,23 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTourna
                         <span className="font-bold text-emerald-400">
                           {p.soldTo.name || 'Team'} ({p.soldPrice?.toLocaleString()} pts)
                         </span>
+                      ) : p.status === 'REJECTED' ? (
+                        <span className="text-[10px] text-rose-400 truncate block max-w-[120px]" title={p.rejectionReason}>
+                          {p.rejectionReason || 'Rejected'}
+                        </span>
                       ) : (
                         '—'
+                      )}
+                    </td>
+                    <td className="p-3 text-right">
+                      {p.status !== 'SOLD' && (
+                        <button
+                          onClick={() => handlePurgePlayer(p._id, p.name)}
+                          className="p-1.5 rounded-lg hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition-colors"
+                          title="Purge player record"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -613,6 +916,58 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTourna
           </table>
         </div>
       </div>
+
+      {/* Verification Proof Lightbox Modal */}
+      {previewProofModal && (
+        <div
+          onClick={() => setPreviewProofModal(null)}
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="glass-panel-glow max-w-2xl w-full rounded-2xl p-6 border border-cricket-gold/40 bg-stadium-card/95 space-y-4"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-stadium-border">
+              <div className="flex items-center gap-2">
+                <FileCheck className="w-5 h-5 text-cricket-gold" />
+                <h3 className="font-extrabold text-white text-base">{previewProofModal.title}</h3>
+              </div>
+              <button
+                onClick={() => setPreviewProofModal(null)}
+                className="p-1.5 rounded-lg bg-stadium-surface hover:bg-slate-700 text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-auto flex items-center justify-center rounded-xl bg-black/60 p-2 border border-stadium-border">
+              <img
+                src={previewProofModal.url}
+                alt="Proof Preview"
+                className="max-h-[65vh] w-auto object-contain rounded-lg shadow-2xl"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <a
+                href={previewProofModal.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-stadium-surface hover:bg-slate-700 text-slate-200 border border-stadium-border"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open in New Tab</span>
+              </a>
+              <button
+                onClick={() => setPreviewProofModal(null)}
+                className="px-5 py-2 rounded-xl text-xs font-extrabold bg-cricket-cyan hover:bg-cyan-400 text-slate-950"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

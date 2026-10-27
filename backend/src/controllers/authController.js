@@ -8,12 +8,20 @@ import { generateToken } from '../utils/token.js';
  */
 export const registerAdmin = async (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, adminSecretKey } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
         message: 'Name, email, and password are required.',
+      });
+    }
+
+    const expectedKey = process.env.ADMIN_REGISTRATION_KEY || 'CRIC_ADMIN_2026';
+    if (!adminSecretKey || adminSecretKey.trim() !== expectedKey.trim()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Invalid Organizer Security Passcode. Only authorized tournament heads may register an admin account.',
       });
     }
 
