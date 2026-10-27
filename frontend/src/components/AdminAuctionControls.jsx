@@ -17,6 +17,7 @@ export const AdminAuctionControls = ({
   activePlayer,
   currentHighestBid,
   currentBidderTeamId,
+  teams,
   players,
   timerRunning,
   status,
@@ -24,6 +25,7 @@ export const AdminAuctionControls = ({
 }) => {
   const { socket } = useSocket();
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
+  const [selectedFallbackTeamId, setSelectedFallbackTeamId] = useState('');
   const [adminError, setAdminError] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -91,16 +93,26 @@ export const AdminAuctionControls = ({
     setTimeout(() => setActionLoading(false), 1500);
   };
 
+  const handleFallbackBid = () => {
+    if (!socket || !selectedFallbackTeamId || !activePlayer) return;
+    setActionLoading(true);
+    socket.emit('ADMIN_FALLBACK_BID', {
+      tournamentId,
+      targetTeamId: selectedFallbackTeamId,
+    });
+    setTimeout(() => setActionLoading(false), 800);
+  };
+
   return (
-    <div className="glass-panel rounded-2xl p-6 border border-cricket-gold/30 bg-stadium-card/90">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-stadium-border/60 mb-6">
+    <div className="glass-panel rounded-2xl p-6 border border-cricket-gold/30 bg-stadium-card/90 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-stadium-border/60">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-cricket-gold/20 flex items-center justify-center text-cricket-gold border border-cricket-gold/40">
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
             <h3 className="font-extrabold text-white text-base">Auctioneer Command Console</h3>
-            <p className="text-xs text-slate-400">Exclusive organizer controls to push players and adjudicate sales</p>
+            <p className="text-xs text-slate-400">Exclusive organizer controls to push players, adjudicate sales, and place fallback bids</p>
           </div>
         </div>
 
@@ -112,12 +124,13 @@ export const AdminAuctionControls = ({
       </div>
 
       {adminError && (
-        <div className="mb-4 flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/40 text-xs font-semibold text-rose-300">
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/40 text-xs font-semibold text-rose-300">
           <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
           <span>{adminError}</span>
         </div>
       )}
 
+      {/* Row 1: Podium & Timer Orchestration */}
       <div className="grid md:grid-cols-12 gap-6 items-end">
         {/* Push Next Player Drawer */}
         <div className="md:col-span-5">
@@ -201,6 +214,54 @@ export const AdminAuctionControls = ({
           </div>
         </div>
       </div>
+
+      {/* Row 2: Fallback Bidding Console (Campus Wi-Fi Disconnect Protection) */}
+      <div className="pt-4 border-t border-stadium-border/60 bg-stadium-surface/40 p-4 rounded-xl border border-stadium-border/40">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-cricket-gold animate-ping"></span>
+              <span className="text-xs font-extrabold uppercase tracking-wider text-cricket-gold">
+                Admin Fallback Bid (Wi-Fi Disconnect Failover)
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Place a verified incremental bid on behalf of a franchise whose campus connection dropped
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <select
+              value={selectedFallbackTeamId}
+              onChange={(e) => setSelectedFallbackTeamId(e.target.value)}
+              disabled={!activePlayer}
+              className="bg-stadium-card border border-stadium-border text-white text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-cricket-gold flex-1 sm:w-64"
+            >
+              <option value="">-- Select disconnected team --</option>
+              {(teams || []).map((t) => {
+                const teamId = t._id || t.id;
+                const isLeading = teamId === currentBidderTeamId;
+                return (
+                  <option key={teamId} value={teamId} disabled={isLeading}>
+                    {t.name} ({t.shortName}) — Purse: {t.remainingPurse?.toLocaleString()} pts {isLeading ? '(Leading)' : ''}
+                  </option>
+                );
+              })}
+            </select>
+
+            <button
+              onClick={handleFallbackBid}
+              disabled={actionLoading || !selectedFallbackTeamId || !activePlayer || selectedFallbackTeamId === currentBidderTeamId}
+              className="px-4 py-2.5 rounded-xl font-extrabold text-xs bg-gradient-to-r from-cricket-gold to-amber-500 hover:brightness-110 text-slate-950 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 shadow-md shadow-amber-950/40"
+            >
+              ⚡ Force Fallback Bid
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
+
+
+

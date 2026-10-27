@@ -93,9 +93,9 @@ export class TournamentEngine {
   }
 
   /**
-   * Hydrates teams cache and settings from MongoDB
+   * Hydrates teams cache, settings, and resurrects active session snapshot on server restart
    */
-  async hydrate() {
+  async hydrate(io = null) {
     const tournament = await Tournament.findById(this.tournamentId);
     if (!tournament) throw new Error(`Tournament ${this.tournamentId} not found`);
 
@@ -119,6 +119,48 @@ export class TournamentEngine {
     }
 
     console.log(`⚡ Hydrated memory cache for tournament ${this.tournamentId} with ${teams.length} teams.`);
+
+    // Server Restart Recovery: Rehydrate activeAuctionSession snapshot if podium was active
+    const savedSession = tournament.activeAuctionSession;
+    if (savedSession && savedSession.activePlayerId) {
+      try {
+        const player = await Player.findById(savedSession.activePlayerId);
+        if (player && player.status === 'ON_PODIUM') {
+          this.session.activePlayer = player;
+          this.session.currentHighestBid = savedSession.currentHighestBid || 0;
+          this.session.currentBidderTeamId = savedSession.currentBidderTeamId ? savedSession.currentBidderTeamId.toString() : null;
+          this.session.currentBidderUserId = savedSession.currentBidderUserId ? savedSession.currentBidderUserId.toString() : null;
+          this.session.snapshotVersion = savedSession.snapshotVersion || 0;
+
+          const now = Date.now();
+          if (savedSession.status === 'BIDDING' && savedSession.endsAt > now) {
+            // Timer was running when server restarted; resume with remaining time
+            const remainingSec = Math.max(1, Math.ceil((savedSession.endsAt - now) / 1000));
+            this.session.endsAt = savedSession.endsAt;
+            this.session.remainingMs = savedSession.endsAt - now;
+            this.session.timerRunning = true;
+            this.session.status = 'BIDDING';
+
+            if (io) {
+              this.startTimer(remainingSec, io);
+            }
+          } else if (savedSession.status === 'BIDDING' && savedSession.endsAt <= now) {
+            // Timer expired while server was offline; set to PAUSED_EXPIRED awaiting admin action
+            this.session.status = 'PAUSED_EXPIRED';
+            this.session.endsAt = 0;
+            this.session.remainingMs = 0;
+            this.session.timerRunning = false;
+          } else {
+            this.session.status = savedSession.status || 'INTRODUCING';
+            this.session.timerRunning = false;
+          }
+
+          console.log(`🔄 [RECOVERY] Successfully resurrected active podium for player "${player.name}" (Bid: ${this.session.currentHighestBid} pts, State: ${this.session.status})`);
+        }
+      } catch (recoveryErr) {
+        console.error('⚠️ Failed to rehydrate active auction session:', recoveryErr.message);
+      }
+    }
   }
 
   /**
@@ -248,12 +290,13 @@ export class TournamentEngine {
 /**
  * Get or create tournament engine singleton
  */
-export const getTournamentEngine = async (tournamentId) => {
+export const getTournamentEngine = async (tournamentId, io = null) => {
   const idStr = tournamentId.toString();
   if (!tournamentEngines.has(idStr)) {
     const engine = new TournamentEngine(idStr);
-    await engine.hydrate();
+    await engine.hydrate(io);
     tournamentEngines.set(idStr, engine);
   }
   return tournamentEngines.get(idStr);
 };
+

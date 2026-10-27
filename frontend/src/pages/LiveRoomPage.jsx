@@ -6,7 +6,8 @@ import { ActivePodium } from '../components/ActivePodium';
 import { FranchiseLeaderboard } from '../components/FranchiseLeaderboard';
 import { LiveBidFeed } from '../components/LiveBidFeed';
 import { AdminAuctionControls } from '../components/AdminAuctionControls';
-import { Radio, AlertCircle } from 'lucide-react';
+import { TeamRosterModal } from '../components/TeamRosterModal';
+import { Radio, AlertCircle, Eye, ShieldAlert } from 'lucide-react';
 
 export const LiveRoomPage = ({ activeTournament }) => {
   const { user, isAdmin } = useAuth();
@@ -23,6 +24,7 @@ export const LiveRoomPage = ({ activeTournament }) => {
   const [recentBids, setRecentBids] = useState([]);
   const [allPlayers, setAllPlayers] = useState([]);
   const [soldBanner, setSoldBanner] = useState(null);
+  const [selectedRosterTeam, setSelectedRosterTeam] = useState(null);
 
   const tournamentId = activeTournament?._id;
 
@@ -194,6 +196,22 @@ export const LiveRoomPage = ({ activeTournament }) => {
 
   return (
     <div className="max-w-[1600px] mx-auto px-4 lg:px-6 py-6 space-y-6">
+      {/* Spectator Mode Banner */}
+      {!user && (
+        <div className="flex items-center justify-between p-3.5 rounded-xl bg-stadium-surface/70 border border-cricket-cyan/30 text-xs">
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4 text-cricket-cyan" />
+            <span className="font-extrabold text-white">Public Spectator Mode:</span>
+            <span className="text-slate-400">
+              You are watching the live tournament auction in real-time. Click any franchise to view their squad roster!
+            </span>
+          </div>
+          <span className="hidden sm:inline-block px-2 py-0.5 rounded bg-cricket-cyan/20 text-cricket-cyan font-bold text-[10px]">
+            READ-ONLY STREAM
+          </span>
+        </div>
+      )}
+
       {/* Sold Announcement Banner */}
       {soldBanner && (
         <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 p-4 rounded-2xl text-center shadow-xl shadow-emerald-950/40 border border-emerald-400/40 animate-pulse">
@@ -213,6 +231,7 @@ export const LiveRoomPage = ({ activeTournament }) => {
           activePlayer={activePlayer}
           currentHighestBid={currentHighestBid}
           currentBidderTeamId={currentBidderTeamId}
+          teams={teams}
           players={allPlayers}
           timerRunning={timerRunning}
           status={status}
@@ -227,6 +246,7 @@ export const LiveRoomPage = ({ activeTournament }) => {
           <FranchiseLeaderboard
             teams={teams}
             tournamentSettings={activeTournament.settings}
+            onSelectTeam={setSelectedRosterTeam}
           />
         </div>
 
@@ -253,6 +273,15 @@ export const LiveRoomPage = ({ activeTournament }) => {
           />
         </div>
       </div>
+
+      {/* Team Roster Modal */}
+      {selectedRosterTeam && (
+        <TeamRosterModal
+          team={selectedRosterTeam}
+          onClose={() => setSelectedRosterTeam(null)}
+        />
+      )}
     </div>
   );
 };
+

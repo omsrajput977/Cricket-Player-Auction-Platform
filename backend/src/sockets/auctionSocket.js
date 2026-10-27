@@ -204,6 +204,114 @@ export const registerAuctionSocketHandlers = (io) => {
     });
 
     /**
+     * ADMIN_FALLBACK_BID
+     * Admin places a bid on behalf of a team whose campus Wi-Fi dropped
+     */
+    socket.on('ADMIN_FALLBACK_BID', async ({ tournamentId, targetTeamId }) => {
+      try {
+        if (!tournamentId || !targetTeamId) return;
+
+        if (socket.data.user.role !== 'ADMIN') {
+          return socket.emit('ERROR', { message: 'Forbidden: Admin role required for fallback bidding.' });
+        }
+
+        const engine = await getTournamentEngine(tournamentId, io);
+
+        await engine.mutex.runExclusive(async () => {
+          const session = engine.session;
+
+          if (session.isFinalizing) {
+            return socket.emit('ERROR', { message: 'Player sale is currently being finalized.' });
+          }
+
+          if (!session.activePlayer || (session.status !== 'BIDDING' && session.status !== 'INTRODUCING')) {
+            return socket.emit('ERROR', { message: 'Bidding is not currently active for this player.' });
+          }
+
+          if (session.timerRunning && Date.now() >= session.endsAt) {
+            return socket.emit('ERROR', { message: 'Bidding time has expired.' });
+          }
+
+          const targetTeamStr = targetTeamId.toString();
+          if (session.currentBidderTeamId === targetTeamStr) {
+            return socket.emit('ERROR', { message: 'This franchise already holds the highest bid.' });
+          }
+
+          const teamCache = engine.teamsCache.get(targetTeamStr);
+          if (!teamCache) {
+            return socket.emit('ERROR', { message: 'Target team not found in tournament cache.' });
+          }
+
+          const nextBid = getNextBid(session.currentHighestBid, session.activePlayer.basePrice);
+
+          // Validate Purse & Reserve using In-Memory Cache
+          const validation = validateBidRules({
+            teamCache,
+            bidAmount: nextBid,
+            minSquadSize: engine.tournamentSettings.minSquadSize,
+            maxSquadSize: engine.tournamentSettings.maxSquadSize,
+            minBasePrice: engine.tournamentSettings.minBasePrice,
+          });
+
+          if (!validation.allowed) {
+            return socket.emit('ERROR', { message: `Fallback bid failed: ${validation.reason}` });
+          }
+
+          // Accept Fallback Bid
+          session.currentHighestBid = nextBid;
+          session.currentBidderTeamId = targetTeamStr;
+          session.currentBidderUserId = socket.data.user.id;
+          session.snapshotVersion += 1;
+
+          // Anti-Sniping Timer Reset
+          const remainingSec = Math.max(0, Math.floor((session.endsAt - Date.now()) / 1000));
+          const antiSnipingDuration = engine.tournamentSettings.antiSnipingSeconds || 15;
+          const newDuration = Math.max(remainingSec, antiSnipingDuration);
+
+          engine.startTimer(newDuration, io);
+
+          const nextNextBid = getNextBid(nextBid, session.activePlayer.basePrice);
+
+          console.log(`📡 [FALLBACK BID] Admin placed fallback bid of ${nextBid.toLocaleString()} pts for ${teamCache.name}`);
+
+          io.to(tournamentId).emit('BID_ACCEPTED', {
+            playerId: session.activePlayer._id,
+            teamId: targetTeamStr,
+            teamName: teamCache.name,
+            teamShortName: teamCache.shortName,
+            teamBrandColor: teamCache.brandColor,
+            bidAmount: nextBid,
+            nextBidAmount: nextNextBid,
+            endsAt: session.endsAt,
+            serverNow: Date.now(),
+            timestamp: new Date().toISOString(),
+            isFallbackBid: true,
+          });
+
+          queueMicrotask(async () => {
+            await engine.persistSnapshot();
+            try {
+              await BidHistory.create({
+                tournamentId,
+                playerId: session.activePlayer._id,
+                teamId: targetTeamStr,
+                bidAmount: nextBid,
+                placedBy: socket.data.user.id,
+                bidType: 'ADMIN_FALLBACK_BID',
+                isWinningBid: false,
+              });
+            } catch (err) {
+              console.error('Async Fallback BidHistory logging failed:', err.message);
+            }
+          });
+        });
+      } catch (err) {
+        console.error('ADMIN_FALLBACK_BID error:', err.message);
+        socket.emit('ERROR', { message: 'Internal error processing fallback bid.' });
+      }
+    });
+
+    /**
      * PLACE_BID
      * Team Owner places an incremental bid
      */

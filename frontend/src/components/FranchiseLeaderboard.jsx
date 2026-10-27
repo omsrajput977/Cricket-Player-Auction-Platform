@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Shield, Users, Wallet } from 'lucide-react';
 
-export const FranchiseLeaderboard = ({ teams, tournamentSettings }) => {
+export const FranchiseLeaderboard = ({ teams, tournamentSettings, onSelectTeam }) => {
   const { user } = useAuth();
   const maxSquad = tournamentSettings?.maxSquadSize || 16;
   const userTeamId = user?.team?._id || user?.team?.id || user?.teamId;
@@ -38,10 +38,11 @@ export const FranchiseLeaderboard = ({ teams, tournamentSettings }) => {
             return (
               <div
                 key={teamId}
-                className={`p-3.5 rounded-xl border transition-all ${
+                onClick={() => onSelectTeam && onSelectTeam(team)}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer group ${
                   isMyTeam
-                    ? 'bg-cricket-cyan/10 border-cricket-cyan/40 shadow-lg shadow-cyan-950/30'
-                    : 'bg-stadium-card/80 border-stadium-border/80 hover:border-slate-600'
+                    ? 'bg-cricket-cyan/10 border-cricket-cyan/40 shadow-lg shadow-cyan-950/30 hover:border-cricket-cyan'
+                    : 'bg-stadium-card/80 border-stadium-border/80 hover:border-slate-500 hover:bg-slate-800/80'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2 mb-2">
