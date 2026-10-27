@@ -5,6 +5,15 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDB } from './config/db.js';
 
+// Route imports
+import authRoutes from './routes/authRoutes.js';
+import tournamentRoutes from './routes/tournamentRoutes.js';
+import teamRoutes from './routes/teamRoutes.js';
+import playerRoutes from './routes/playerRoutes.js';
+
+// Socket handlers
+import { registerAuctionSocketHandlers } from './sockets/auctionSocket.js';
+
 // Load environment variables
 dotenv.config();
 
@@ -53,6 +62,15 @@ app.get('/', (req, res) => {
     documentation: '/api/health',
   });
 });
+
+// REST API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/tournaments', tournamentRoutes);
+app.use('/api/teams', teamRoutes);
+app.use('/api/players', playerRoutes);
+
+// Register Real-Time Socket.io Handlers
+registerAuctionSocketHandlers(io);
 
 // Centralized Error Handling Middleware
 app.use((err, req, res, next) => {
