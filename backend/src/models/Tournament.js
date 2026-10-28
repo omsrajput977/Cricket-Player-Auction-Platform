@@ -79,7 +79,7 @@ const tournamentSchema = new mongoose.Schema(
       },
       status: {
         type: String,
-        enum: ['IDLE', 'INTRODUCING', 'BIDDING', 'PAUSED_EXPIRED'],
+        enum: ['IDLE', 'INTRODUCING', 'BIDDING', 'PAUSED', 'PAUSED_EXPIRED'],
         default: 'IDLE',
       },
       snapshotVersion: {
