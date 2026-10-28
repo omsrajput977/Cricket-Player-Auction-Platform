@@ -5,6 +5,7 @@ import { User, Flame, Clock, AlertTriangle, ArrowUpRight, Award, Zap, Pause } fr
 
 export const ActivePodium = ({
   tournamentId,
+  tournamentStatus,
   activePlayer,
   currentHighestBid,
   currentBidderTeamId,
@@ -279,6 +280,7 @@ export const ActivePodium = ({
               disabled={
                 biddingLoading ||
                 isUserTeamLeading ||
+                tournamentStatus !== 'LIVE_AUCTION' ||
                 status !== 'BIDDING' ||
                 !timerRunning ||
                 remainingSec === 0
@@ -286,6 +288,10 @@ export const ActivePodium = ({
               className={`w-full md:w-auto px-8 py-4 rounded-xl font-extrabold text-base flex items-center justify-center gap-3 shadow-xl transition-all ${
                 isUserTeamLeading
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 cursor-not-allowed'
+                  : tournamentStatus === 'PAUSED'
+                  ? 'bg-slate-800/90 text-amber-400 border border-amber-500/40 cursor-not-allowed shadow-none'
+                  : tournamentStatus !== 'LIVE_AUCTION'
+                  ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed shadow-none'
                   : status === 'INTRODUCING'
                   ? 'bg-slate-800/90 text-amber-300/90 border border-amber-500/40 cursor-not-allowed shadow-none'
                   : status === 'PAUSED'
@@ -299,6 +305,16 @@ export const ActivePodium = ({
                 <>
                   <Award className="w-5 h-5 text-emerald-400" />
                   <span>YOUR TEAM LEADS</span>
+                </>
+              ) : tournamentStatus === 'PAUSED' ? (
+                <>
+                  <Pause className="w-5 h-5 text-amber-400" />
+                  <span>AUCTION PAUSED BY ORGANIZER</span>
+                </>
+              ) : tournamentStatus !== 'LIVE_AUCTION' ? (
+                <>
+                  <Clock className="w-5 h-5 text-slate-400" />
+                  <span>AUCTION NOT ACTIVE</span>
                 </>
               ) : status === 'INTRODUCING' ? (
                 <>

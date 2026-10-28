@@ -44,6 +44,8 @@ export const io = new Server(server, {
   pingInterval: 10000,
 });
 
+app.set('io', io);
+
 // Middleware configuration
 app.use(
   cors({

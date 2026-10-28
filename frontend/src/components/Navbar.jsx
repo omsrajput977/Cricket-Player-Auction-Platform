@@ -31,7 +31,7 @@ export const Navbar = ({ activeView, setActiveView, tournaments, activeTournamen
 
         {/* Tournament Selector */}
         {tournaments && tournaments.length > 0 && (
-          <div className="hidden md:flex items-center gap-2 bg-stadium-card/80 border border-stadium-border px-3 py-1.5 rounded-lg text-sm">
+          <div className="hidden md:flex items-center gap-2.5 bg-stadium-card/80 border border-stadium-border px-3 py-1.5 rounded-lg text-sm">
             <span className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Tournament:</span>
             <select
               value={activeTournament?._id || ''}
@@ -47,6 +47,24 @@ export const Navbar = ({ activeView, setActiveView, tournaments, activeTournamen
                 </option>
               ))}
             </select>
+
+            {activeTournament && (
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border transition-all ${
+                  activeTournament.status === 'LIVE_AUCTION'
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 animate-pulse-fast'
+                    : activeTournament.status === 'PAUSED'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                }`}
+              >
+                {activeTournament.status === 'LIVE_AUCTION'
+                  ? '● LIVE'
+                  : activeTournament.status === 'PAUSED'
+                  ? '⏸ PAUSED'
+                  : activeTournament.status || 'DRAFT'}
+              </span>
+            )}
           </div>
         )}
 

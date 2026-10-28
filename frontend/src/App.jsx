@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
+import { useSocket } from './context/SocketContext';
 import { apiRequest } from './utils/api';
 import { Navbar } from './components/Navbar';
 import { LiveRoomPage } from './pages/LiveRoomPage';
@@ -10,6 +11,7 @@ import { PublicLookupPage } from './pages/PublicLookupPage';
 
 export default function App() {
   const { user, isAdmin } = useAuth();
+  const { socket } = useSocket();
   const [activeView, setActiveView] = useState('live-room');
   const [tournaments, setTournaments] = useState([]);
   const [activeTournament, setActiveTournament] = useState(null);
@@ -33,6 +35,24 @@ export default function App() {
   useEffect(() => {
     loadTournaments();
   }, []);
+
+  // Real-time synchronization of tournament status changes across all clients
+  useEffect(() => {
+    if (!socket) return;
+    const handleStatusUpdate = ({ tournamentId, status, tournament }) => {
+      setTournaments((prev) =>
+        prev.map((t) => (t._id === tournamentId ? { ...t, status, ...(tournament || {}) } : t))
+      );
+      setActiveTournament((prev) => {
+        if (prev && prev._id === tournamentId) {
+          return { ...prev, status, ...(tournament || {}) };
+        }
+        return prev;
+      });
+    };
+    socket.on('TOURNAMENT_STATUS_UPDATED', handleStatusUpdate);
+    return () => socket.off('TOURNAMENT_STATUS_UPDATED', handleStatusUpdate);
+  }, [socket]);
 
   return (
     <div className="min-h-screen bg-stadium-darkest text-slate-100 flex flex-col">
@@ -64,13 +84,18 @@ export default function App() {
           <AdminSetupPage
             activeTournament={activeTournament}
             setActiveTournament={setActiveTournament}
+            setActiveView={setActiveView}
             onTournamentCreated={(newTourney) => {
               setTournaments((prev) => [newTourney, ...prev]);
               setActiveTournament(newTourney);
             }}
           />
         ) : (
-          <LiveRoomPage activeTournament={activeTournament} />
+          <LiveRoomPage
+            activeTournament={activeTournament}
+            setActiveTournament={setActiveTournament}
+            setActiveView={setActiveView}
+          />
         )}
       </main>
 

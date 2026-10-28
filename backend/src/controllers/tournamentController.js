@@ -1,4 +1,5 @@
 import Tournament from '../models/Tournament.js';
+import { getTournamentEngine } from '../services/auctionEngine.js';
 
 /**
  * Create a new Tournament
@@ -149,6 +150,29 @@ export const updateTournamentStatus = async (req, res, next) => {
     if (currentRound) tournament.currentRound = currentRound;
 
     await tournament.save();
+
+    // Broadcast status change in real time via Socket.io
+    const io = req.app.get('io');
+    if (io) {
+      // If tournament is paused, automatically pause any running auction timer in memory
+      if (tournament.status === 'PAUSED') {
+        try {
+          const engine = await getTournamentEngine(tournament._id.toString());
+          if (engine && engine.session.timerRunning) {
+            engine.pauseTimer(io);
+            await engine.persistSnapshot();
+          }
+        } catch (engineErr) {
+          console.error('Failed to auto-pause engine timer on tournament pause:', engineErr.message);
+        }
+      }
+
+      io.to(tournament._id.toString()).emit('TOURNAMENT_STATUS_UPDATED', {
+        tournamentId: tournament._id.toString(),
+        status: tournament.status,
+        tournament,
+      });
+    }
 
     res.status(200).json({
       success: true,

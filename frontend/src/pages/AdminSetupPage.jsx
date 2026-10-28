@@ -18,10 +18,15 @@ import {
   ShieldAlert,
   XCircle,
   Search,
+  Play,
+  Pause,
+  Zap,
+  Radio,
+  ArrowRight,
 } from 'lucide-react';
 import { UnsoldRecallDrawer } from '../components/UnsoldRecallDrawer';
 
-export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTournamentCreated }) => {
+export const AdminSetupPage = ({ activeTournament, setActiveTournament, setActiveView, onTournamentCreated }) => {
   const [teams, setTeams] = useState([]);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -29,6 +34,7 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTourna
   const [approvalSettings, setApprovalSettings] = useState({});
   const [previewProofModal, setPreviewProofModal] = useState(null);
   const [rejectReasonInput, setRejectReasonInput] = useState({});
+  const [showLiveModal, setShowLiveModal] = useState(false);
 
   // Tournament creation form
   const [tournamentForm, setTournamentForm] = useState({
@@ -117,7 +123,7 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTourna
     }
   };
 
-  // Switch status to LIVE_AUCTION
+  // Switch status to LIVE_AUCTION or PAUSED
   const handleToggleLiveStatus = async () => {
     if (!activeTournament) return;
     try {
@@ -128,7 +134,12 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTourna
       });
       if (res.success) {
         setActiveTournament(res.data);
-        notify('success', `Tournament status changed to ${newStatus}`);
+        if (newStatus === 'LIVE_AUCTION') {
+          notify('success', `🟢 Tournament is now LIVE! Bidding arena opened.`);
+          setShowLiveModal(true);
+        } else {
+          notify('info', `⏸ Tournament auction paused. Bidding frozen on all screens.`);
+        }
       }
     } catch (err) {
       notify('error', err.message);
@@ -352,29 +363,104 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, onTourna
         </div>
 
         {activeTournament && (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <span
-              className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${
+              className={`px-3 py-1.5 rounded-full text-xs font-black border uppercase tracking-wider flex items-center gap-1.5 ${
                 activeTournament.status === 'LIVE_AUCTION'
-                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 animate-pulse-fast'
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 animate-pulse-fast'
+                  : activeTournament.status === 'PAUSED'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                   : 'bg-slate-800 text-slate-400 border-slate-700'
               }`}
             >
-              {activeTournament.status}
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  activeTournament.status === 'LIVE_AUCTION'
+                    ? 'bg-emerald-400'
+                    : activeTournament.status === 'PAUSED'
+                    ? 'bg-amber-400'
+                    : 'bg-slate-400'
+                }`}
+              />
+              {activeTournament.status === 'LIVE_AUCTION' ? '● LIVE AUCTION' : activeTournament.status}
             </span>
+
+            {/* Quick jump to live stage if live */}
+            {activeTournament.status === 'LIVE_AUCTION' && (
+              <button
+                type="button"
+                onClick={() => setActiveView && setActiveView('live-room')}
+                className="px-4 py-2.5 rounded-xl font-extrabold text-xs bg-cricket-cyan/20 text-cricket-cyan border border-cricket-cyan/40 hover:bg-cricket-cyan/30 transition-all flex items-center gap-1.5 shadow-lg shadow-cyan-500/10 cursor-pointer"
+              >
+                <Zap className="w-3.5 h-3.5 fill-current" />
+                <span>Enter Live Stage</span>
+              </button>
+            )}
+
             <button
               onClick={handleToggleLiveStatus}
-              className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all shadow-lg ${
+              className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all shadow-lg flex items-center gap-2 cursor-pointer ${
                 activeTournament.status === 'LIVE_AUCTION'
                   ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20'
-                  : 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 hover:brightness-110 shadow-emerald-500/20'
+                  : 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 hover:brightness-110 shadow-emerald-500/25'
               }`}
             >
-              {activeTournament.status === 'LIVE_AUCTION' ? 'Pause Auction' : 'Activate LIVE_AUCTION Mode'}
+              {activeTournament.status === 'LIVE_AUCTION' ? (
+                <>
+                  <Pause className="w-4 h-4 fill-current" />
+                  <span>Pause Live Auction</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>Activate LIVE_AUCTION Mode</span>
+                </>
+              )}
             </button>
           </div>
         )}
       </div>
+
+      {/* Live Auction Activated Modal */}
+      {showLiveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-emerald-500/50 max-w-lg w-full bg-gradient-to-b from-stadium-card to-stadium-dark shadow-2xl shadow-emerald-950/60 text-center space-y-5">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <Zap className="w-8 h-8 fill-current animate-bounce" />
+            </div>
+            <div>
+              <span className="text-xs font-black uppercase tracking-widest text-emerald-400">
+                Tournament Status: LIVE
+              </span>
+              <h2 className="text-2xl font-black text-white mt-1">
+                {activeTournament?.name} is Officially Live!
+              </h2>
+              <p className="text-sm text-slate-300 mt-2 leading-relaxed">
+                All franchise teams and spectator feeds are now synchronized in real-time. Live bidding is enabled on the arena podium!
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                onClick={() => {
+                  setShowLiveModal(false);
+                  if (setActiveView) setActiveView('live-room');
+                }}
+                className="flex-1 py-3.5 px-5 rounded-xl font-extrabold text-sm bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 hover:brightness-110 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <span>Launch Live Stage Arena</span>
+                <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+              </button>
+              <button
+                onClick={() => setShowLiveModal(false)}
+                className="py-3.5 px-5 rounded-xl font-bold text-sm bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-all cursor-pointer"
+              >
+                Stay in Setup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Tournament Configuration */}

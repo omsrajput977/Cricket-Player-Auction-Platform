@@ -84,9 +84,13 @@ export const registerAuctionSocketHandlers = (io) => {
             .populate('teamId', 'name shortName brandColor');
         }
 
+        // Fetch tournament status
+        const tournamentDoc = await Tournament.findById(tournamentId).select('status name edition settings');
+
         socket.emit('ROOM_STATE_SYNC', {
           ...snapshot,
           recentBids,
+          tournamentStatus: tournamentDoc?.status || 'DRAFT',
         });
       } catch (err) {
         console.error('JOIN_AUCTION_ROOM error:', err.message);
@@ -247,6 +251,18 @@ export const registerAuctionSocketHandlers = (io) => {
           const duration = engine.tournamentSettings.timerDurationSeconds || 20;
           engine.startTimer(duration, io);
 
+          // If tournament was PAUSED or DRAFT, automatically activate LIVE_AUCTION mode upon starting bidding
+          const tournamentDoc = await Tournament.findById(tournamentId);
+          if (tournamentDoc && tournamentDoc.status !== 'LIVE_AUCTION') {
+            tournamentDoc.status = 'LIVE_AUCTION';
+            await tournamentDoc.save();
+            io.to(tournamentId.toString()).emit('TOURNAMENT_STATUS_UPDATED', {
+              tournamentId: tournamentDoc._id.toString(),
+              status: tournamentDoc.status,
+              tournament: tournamentDoc,
+            });
+          }
+
           await engine.persistSnapshot();
 
           io.to(tournamentId).emit('BIDDING_STARTED', {
@@ -258,6 +274,41 @@ export const registerAuctionSocketHandlers = (io) => {
         });
       } catch (err) {
         console.error('ADMIN_START_BIDDING error:', err.message);
+        socket.emit('ERROR', { message: err.message });
+      }
+    });
+
+    /**
+     * ADMIN_UPDATE_TOURNAMENT_STATUS
+     * Directly toggles tournament status (LIVE_AUCTION / PAUSED) over WebSocket
+     */
+    socket.on('ADMIN_UPDATE_TOURNAMENT_STATUS', async ({ tournamentId, status }) => {
+      try {
+        if (socket.data.user.role !== 'ADMIN') {
+          return socket.emit('ERROR', { message: 'Forbidden: Admin role required.' });
+        }
+
+        const tournament = await Tournament.findById(tournamentId);
+        if (!tournament) {
+          return socket.emit('ERROR', { message: 'Tournament not found.' });
+        }
+
+        tournament.status = status;
+        await tournament.save();
+
+        const engine = await getTournamentEngine(tournamentId);
+        if (status === 'PAUSED' && engine.session.timerRunning) {
+          engine.pauseTimer(io);
+          await engine.persistSnapshot();
+        }
+
+        io.to(tournamentId.toString()).emit('TOURNAMENT_STATUS_UPDATED', {
+          tournamentId: tournament._id.toString(),
+          status: tournament.status,
+          tournament,
+        });
+      } catch (err) {
+        console.error('ADMIN_UPDATE_TOURNAMENT_STATUS error:', err.message);
         socket.emit('ERROR', { message: err.message });
       }
     });
@@ -316,6 +367,11 @@ export const registerAuctionSocketHandlers = (io) => {
 
         await engine.mutex.runExclusive(async () => {
           const session = engine.session;
+
+          const tourney = await Tournament.findById(tournamentId).select('status');
+          if (tourney && tourney.status !== 'LIVE_AUCTION') {
+            return socket.emit('ERROR', { message: `Tournament auction is currently ${tourney.status}. Activate LIVE_AUCTION mode to enable bidding.` });
+          }
 
           if (!session.activePlayer) {
             return socket.emit('ERROR', { message: 'No player on the podium.' });
@@ -427,6 +483,14 @@ export const registerAuctionSocketHandlers = (io) => {
 
         await engine.mutex.runExclusive(async () => {
           const session = engine.session;
+
+          // Guard 0: Tournament must be in LIVE_AUCTION mode
+          const tourney = await Tournament.findById(tournamentId).select('status');
+          if (tourney && tourney.status !== 'LIVE_AUCTION') {
+            return socket.emit('BID_REJECTED', {
+              reason: `Auction is currently ${tourney.status}. Bids can only be placed when LIVE_AUCTION mode is active.`,
+            });
+          }
 
           // 1. Guard: Finalization in progress
           if (session.isFinalizing) {

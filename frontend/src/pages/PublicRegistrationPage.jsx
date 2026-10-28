@@ -137,6 +137,13 @@ export const PublicRegistrationPage = ({ tournaments, activeTournament, setActiv
         <p className="text-sm text-slate-400 mt-1 max-w-lg mx-auto">
           Submit your player credentials for the college tournament cricket auction. All submissions undergo organizer verification.
         </p>
+
+        {activeTournament?.status === 'LIVE_AUCTION' && (
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold mt-3">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse-fast"></span>
+            <span>Live Auction In Progress — Late nominations enter emergency review queue</span>
+          </div>
+        )}
       </div>
 
       {/* Success State */}

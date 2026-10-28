@@ -14,6 +14,8 @@ import {
 
 export const AdminAuctionControls = ({
   tournamentId,
+  tournamentStatus,
+  onToggleLiveStatus,
   activePlayer,
   currentHighestBid,
   currentBidderTeamId,
@@ -126,11 +128,26 @@ export const AdminAuctionControls = ({
           </div>
         </div>
 
-        {status && (
-          <span className="self-start sm:self-auto text-xs font-mono font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-slate-800 text-cricket-gold border border-cricket-gold/30">
-            Podium State: {status}
-          </span>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {tournamentStatus && (
+            <span
+              className={`text-xs font-mono font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${
+                tournamentStatus === 'LIVE_AUCTION'
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                  : tournamentStatus === 'PAUSED'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  : 'bg-slate-800 text-slate-400 border-slate-700'
+              }`}
+            >
+              Tournament: {tournamentStatus}
+            </span>
+          )}
+          {status && (
+            <span className="text-xs font-mono font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-slate-800 text-cricket-gold border border-cricket-gold/30">
+              Podium: {status}
+            </span>
+          )}
+        </div>
       </div>
 
       {adminError && (
