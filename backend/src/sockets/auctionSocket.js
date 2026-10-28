@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { verifyToken } from '../utils/token.js';
 import { getTournamentEngine, getNextBid, validateBidRules } from '../services/auctionEngine.js';
+import { isDomainAllowed } from '../utils/domain.js';
 import Player from '../models/Player.js';
 import Team from '../models/Team.js';
 import Tournament from '../models/Tournament.js';
@@ -31,22 +32,25 @@ export const registerAuctionSocketHandlers = (io) => {
 
         socket.data.user = {
           id: decoded.id,
-          role: decoded.role,
+          email: decoded.email ? decoded.email.toLowerCase().trim() : null,
+          role: decoded.role || 'SPECTATOR',
           teamId: extractedTeamId,
         };
       } else {
         // Unauthenticated spectator
         socket.data.user = {
           id: null,
+          email: null,
           role: 'SPECTATOR',
           teamId: null,
         };
       }
       next();
     } catch (err) {
-      // Allow connection as SPECTATOR if token is invalid or expired
+      // Allow connection as unauthenticated SPECTATOR if token is invalid or expired
       socket.data.user = {
         id: null,
+        email: null,
         role: 'SPECTATOR',
         teamId: null,
       };
@@ -55,15 +59,41 @@ export const registerAuctionSocketHandlers = (io) => {
   });
 
   io.on('connection', (socket) => {
-    console.log(`🔌 Socket connected: ${socket.id} (Role: ${socket.data.user.role}, Team: ${socket.data.user.teamId})`);
+    console.log(`🔌 Socket connected: ${socket.id} (Role: ${socket.data.user.role}, Email: ${socket.data.user.email || 'none'}, Team: ${socket.data.user.teamId})`);
 
     /**
      * JOIN_AUCTION_ROOM
      * Joins tournament room and sends initial state snapshot
+     * Reject if spectator's email domain does not match tournament's allowedEmailDomain
      */
     socket.on('JOIN_AUCTION_ROOM', async ({ tournamentId }) => {
       try {
         if (!tournamentId) return;
+
+        // Fetch tournament status and domain restrictions
+        const tournamentDoc = await Tournament.findById(tournamentId).select('status name edition settings allowedEmailDomain');
+        if (!tournamentDoc) {
+          socket.emit('ERROR', { message: 'Tournament not found.' });
+          return;
+        }
+
+        const user = socket.data.user || {};
+
+        // Multi-tenant domain isolation check
+        if (tournamentDoc.allowedEmailDomain) {
+          if (user.role !== 'ADMIN') {
+            const userEmail = user.email;
+            if (!userEmail || !isDomainAllowed(userEmail, tournamentDoc.allowedEmailDomain)) {
+              console.warn(`⛔ [Socket Isolation] Denied JOIN_AUCTION_ROOM for socket ${socket.id} (user: ${userEmail || 'unauthenticated'}) to tournament "${tournamentDoc.name}" (${tournamentDoc.allowedEmailDomain})`);
+              socket.emit('ERROR', {
+                code: 'DOMAIN_RESTRICTED',
+                message: `Access denied. This live auction is isolated to students with email domain ${tournamentDoc.allowedEmailDomain}. Please sign in with your college email.`,
+                allowedEmailDomain: tournamentDoc.allowedEmailDomain,
+              });
+              return;
+            }
+          }
+        }
 
         socket.join(tournamentId.toString());
         const engine = await getTournamentEngine(tournamentId);
@@ -84,13 +114,11 @@ export const registerAuctionSocketHandlers = (io) => {
             .populate('teamId', 'name shortName brandColor');
         }
 
-        // Fetch tournament status
-        const tournamentDoc = await Tournament.findById(tournamentId).select('status name edition settings');
-
         socket.emit('ROOM_STATE_SYNC', {
           ...snapshot,
           recentBids,
           tournamentStatus: tournamentDoc?.status || 'DRAFT',
+          allowedEmailDomain: tournamentDoc?.allowedEmailDomain || null,
         });
       } catch (err) {
         console.error('JOIN_AUCTION_ROOM error:', err.message);

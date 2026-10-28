@@ -1,5 +1,6 @@
 import Tournament from '../models/Tournament.js';
 import { getTournamentEngine } from '../services/auctionEngine.js';
+import { isDomainAllowed, formatDomain } from '../utils/domain.js';
 
 /**
  * Create a new Tournament
@@ -7,7 +8,7 @@ import { getTournamentEngine } from '../services/auctionEngine.js';
  */
 export const createTournament = async (req, res, next) => {
   try {
-    const { name, edition, settings } = req.body;
+    const { name, edition, settings, allowedEmailDomain } = req.body;
 
     if (!name) {
       return res.status(400).json({
@@ -16,10 +17,13 @@ export const createTournament = async (req, res, next) => {
       });
     }
 
+    const formattedDomain = allowedEmailDomain ? formatDomain(allowedEmailDomain) : null;
+
     const tournament = await Tournament.create({
       name,
       edition: edition || '2026',
       settings: settings || {},
+      allowedEmailDomain: formattedDomain,
       createdBy: req.user._id,
     });
 
@@ -36,6 +40,10 @@ export const createTournament = async (req, res, next) => {
 /**
  * Get all tournaments
  * GET /api/tournaments
+ * Multi-tenant isolation:
+ * - ADMIN: Returns all tournaments
+ * - Logged-in user: Returns unrestricted tournaments + tournaments matching user's email domain
+ * - Public/Unauthenticated: Returns only unrestricted open tournaments
  */
 export const getTournaments = async (req, res, next) => {
   try {
@@ -43,10 +51,32 @@ export const getTournaments = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .populate('createdBy', 'name email');
 
+    const user = req.user;
+
+    // Super Admin gets all tournaments
+    if (user && user.role === 'ADMIN') {
+      return res.status(200).json({
+        success: true,
+        count: tournaments.length,
+        data: tournaments,
+      });
+    }
+
+    // Filter by allowedEmailDomain
+    const filteredTournaments = tournaments.filter((t) => {
+      // If tournament has no domain restriction, it is public/open
+      if (!t.allowedEmailDomain) return true;
+
+      // If restricted, user must have an email matching the allowed domain
+      if (!user || !user.email) return false;
+
+      return isDomainAllowed(user.email, t.allowedEmailDomain);
+    });
+
     res.status(200).json({
       success: true,
-      count: tournaments.length,
-      data: tournaments,
+      count: filteredTournaments.length,
+      data: filteredTournaments,
     });
   } catch (error) {
     next(error);
@@ -69,6 +99,19 @@ export const getTournamentById = async (req, res, next) => {
         success: false,
         message: 'Tournament not found.',
       });
+    }
+
+    // Security check: If tournament has domain restriction, ensure user is authorized
+    if (tournament.allowedEmailDomain) {
+      const user = req.user;
+      if (!user || (user.role !== 'ADMIN' && !isDomainAllowed(user.email, tournament.allowedEmailDomain))) {
+        return res.status(403).json({
+          success: false,
+          code: 'DOMAIN_RESTRICTED',
+          message: `Access denied. This tournament is restricted to users with email domain ${tournament.allowedEmailDomain}. Please sign in with your college email.`,
+          allowedEmailDomain: tournament.allowedEmailDomain,
+        });
+      }
     }
 
     res.status(200).json({
@@ -117,6 +160,10 @@ export const updateTournamentSettings = async (req, res, next) => {
         tournament.settings[key] = req.body[key];
       }
     });
+
+    if (req.body.allowedEmailDomain !== undefined) {
+      tournament.allowedEmailDomain = req.body.allowedEmailDomain ? formatDomain(req.body.allowedEmailDomain) : null;
+    }
 
     await tournament.save();
 

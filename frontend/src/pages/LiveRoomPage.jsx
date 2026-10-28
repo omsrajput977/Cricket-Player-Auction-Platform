@@ -26,8 +26,14 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
   const [allPlayers, setAllPlayers] = useState([]);
   const [soldBanner, setSoldBanner] = useState(null);
   const [selectedRosterTeam, setSelectedRosterTeam] = useState(null);
+  const [domainRestrictedError, setDomainRestrictedError] = useState(null);
 
   const tournamentId = activeTournament?._id;
+
+  // Clear any domain restriction error when tournament changes
+  useEffect(() => {
+    setDomainRestrictedError(null);
+  }, [tournamentId]);
 
   // Fetch full tournament players list for the Admin Queue
   const fetchTournamentPlayers = async () => {
@@ -207,6 +213,13 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
       setTeams(updatedTeams);
     });
 
+    // 10. Multi-Tenant Domain Error Handling
+    socket.on('ERROR', (err) => {
+      if (err?.code === 'DOMAIN_RESTRICTED') {
+        setDomainRestrictedError(err.message || 'Access denied: Isolated collegiate tournament.');
+      }
+    });
+
     return () => {
       socket.off('ROOM_STATE_SYNC');
       socket.off('PLAYER_ON_PODIUM');
@@ -219,8 +232,33 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
       socket.off('PLAYER_SOLD');
       socket.off('PLAYER_UNSOLD');
       socket.off('TEAMS_UPDATED');
+      socket.off('ERROR');
     };
   }, [socket, tournamentId]);
+
+  if (domainRestrictedError) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-20 text-center animate-fade-in">
+        <div className="glass-panel-glow p-8 rounded-2xl border border-rose-500/40 shadow-2xl shadow-rose-950/20">
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/20 flex items-center justify-center mx-auto mb-4 border border-rose-500/40">
+            <ShieldAlert className="w-8 h-8 text-rose-400" />
+          </div>
+          <h2 className="text-2xl font-black text-white mb-2">Isolated College Arena</h2>
+          <p className="text-sm text-slate-300 mb-6 leading-relaxed">
+            {domainRestrictedError}
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              onClick={() => setActiveView('login')}
+              className="px-5 py-2.5 rounded-xl text-xs font-bold bg-cricket-cyan text-slate-950 hover:bg-cyan-400 transition-all cursor-pointer shadow-lg shadow-cyan-500/20"
+            >
+              Sign In with Authorized College Email
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!activeTournament) {
     return (

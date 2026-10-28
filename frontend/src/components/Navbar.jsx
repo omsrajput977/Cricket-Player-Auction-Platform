@@ -30,7 +30,7 @@ export const Navbar = ({ activeView, setActiveView, tournaments, activeTournamen
         </div>
 
         {/* Tournament Selector */}
-        {tournaments && tournaments.length > 0 && (
+        {tournaments && tournaments.length > 0 ? (
           <div className="hidden md:flex items-center gap-2.5 bg-stadium-card/80 border border-stadium-border px-3 py-1.5 rounded-lg text-sm">
             <span className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Tournament:</span>
             <select
@@ -39,11 +39,11 @@ export const Navbar = ({ activeView, setActiveView, tournaments, activeTournamen
                 const found = tournaments.find((t) => t._id === e.target.value);
                 if (found) setActiveTournament(found);
               }}
-              className="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer"
+              className="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer max-w-[200px] truncate"
             >
               {tournaments.map((t) => (
                 <option key={t._id} value={t._id} className="bg-stadium-card text-white">
-                  {t.name} ({t.edition})
+                  {t.name} {t.allowedEmailDomain ? `[${t.allowedEmailDomain}]` : `(${t.edition})`}
                 </option>
               ))}
             </select>
@@ -65,6 +65,10 @@ export const Navbar = ({ activeView, setActiveView, tournaments, activeTournamen
                   : activeTournament.status || 'DRAFT'}
               </span>
             )}
+          </div>
+        ) : (
+          <div className="hidden md:flex items-center gap-2 bg-slate-900/60 border border-slate-800 px-3 py-1 rounded-lg text-xs text-slate-400">
+            <span>No isolated tournaments for your domain</span>
           </div>
         )}
 
@@ -127,7 +131,13 @@ export const Navbar = ({ activeView, setActiveView, tournaments, activeTournamen
                   {user.name}
                 </div>
                 <div className="text-[10px] uppercase font-bold text-cricket-cyan">
-                  {isAdmin ? 'Tournament Admin' : user.team ? user.team.name : 'Team Owner'}
+                  {isAdmin
+                    ? 'Tournament Admin'
+                    : user.role === 'SPECTATOR'
+                    ? `Spectator (${user.email ? user.email.split('@')[1] : 'College'})`
+                    : user.team
+                    ? user.team.name
+                    : 'Team Owner'}
                 </div>
               </div>
               <button

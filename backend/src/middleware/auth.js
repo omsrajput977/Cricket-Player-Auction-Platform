@@ -37,6 +37,27 @@ export const authenticate = async (req, res, next) => {
 };
 
 /**
+ * Optional Authentication Middleware
+ * Decodes Bearer JWT if provided, but allows unauthenticated requests
+ */
+export const optionalAuthenticate = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const decoded = verifyToken(token);
+      req.user = decoded; // { id, email, role, teamId }
+    } else {
+      req.user = null;
+    }
+  } catch (err) {
+    // If token expired/invalid, treat as unauthenticated
+    req.user = null;
+  }
+  next();
+};
+
+/**
  * Role-Based Access Control Middleware
  * @param  {...string} roles
  */

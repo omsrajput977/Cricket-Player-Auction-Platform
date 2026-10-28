@@ -22,6 +22,12 @@ const tournamentSchema = new mongoose.Schema(
       enum: ['ROUND_1', 'ROUND_2_ACCELERATED'],
       default: 'ROUND_1',
     },
+    allowedEmailDomain: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: null, // e.g., "@scaler.edu" or "@iitb.ac.in", null means open/public
+    },
     settings: {
       startingPurse: {
         type: Number,

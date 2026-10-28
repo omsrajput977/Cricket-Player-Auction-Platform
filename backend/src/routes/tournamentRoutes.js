@@ -6,12 +6,12 @@ import {
   updateTournamentSettings,
   updateTournamentStatus,
 } from '../controllers/tournamentController.js';
-import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { authenticate, optionalAuthenticate, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.get('/', getTournaments);
-router.get('/:id', getTournamentById);
+router.get('/', optionalAuthenticate, getTournaments);
+router.get('/:id', optionalAuthenticate, getTournamentById);
 
 // Admin-protected endpoints
 router.post('/', authenticate, requireAdmin, createTournament);

@@ -86,6 +86,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginWithGoogle = async (credentialOrPayload) => {
+    const body =
+      typeof credentialOrPayload === 'string'
+        ? { credential: credentialOrPayload }
+        : credentialOrPayload;
+
+    const res = await apiRequest('/auth/google', {
+      method: 'POST',
+      body,
+    });
+
+    if (res.success && res.data) {
+      setToken(res.data.token);
+      setUser(res.data.user);
+      localStorage.setItem('cricauction_token', res.data.token);
+      localStorage.setItem('cricauction_user', JSON.stringify(res.data.user));
+      return res.data;
+    }
+  };
+
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -100,11 +120,13 @@ export const AuthProvider = ({ children }) => {
         token,
         loading,
         login,
+        loginWithGoogle,
         registerAdmin,
         logout,
         isAuthenticated: !!user,
         isAdmin: user?.role === 'ADMIN',
         isTeamOwner: user?.role === 'TEAM_OWNER',
+        isSpectator: user?.role === 'SPECTATOR',
       }}
     >
       {children}

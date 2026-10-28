@@ -40,6 +40,7 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, setActiv
   const [tournamentForm, setTournamentForm] = useState({
     name: 'Inter-College Premier League',
     edition: '2026',
+    allowedEmailDomain: '@scaler.edu',
     startingPurse: 10000000,
     minSquadSize: 11,
     maxSquadSize: 16,
@@ -95,6 +96,9 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, setActiv
   // Create Tournament
   const handleCreateTournament = async (e) => {
     e.preventDefault();
+    if (!tournamentForm.allowedEmailDomain || !tournamentForm.allowedEmailDomain.trim()) {
+      return notify('error', 'Authorized College Email Domain is mandatory (e.g. @scaler.edu or @iitb.ac.in)');
+    }
     setLoading(true);
     try {
       const res = await apiRequest('/tournaments', {
@@ -102,6 +106,7 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, setActiv
         body: {
           name: tournamentForm.name,
           edition: tournamentForm.edition,
+          allowedEmailDomain: tournamentForm.allowedEmailDomain.trim(),
           settings: {
             startingPurse: Number(tournamentForm.startingPurse),
             minSquadSize: Number(tournamentForm.minSquadSize),
@@ -357,8 +362,14 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, setActiv
             <Trophy className="w-7 h-7 text-cricket-gold" />
             <h1 className="text-2xl font-black text-white">Organizer Setup Console</h1>
           </div>
-          <p className="text-sm text-slate-400 mt-1">
-            Active: <strong className="text-white">{activeTournament ? activeTournament.name : 'No Tournament Selected'}</strong>
+          <p className="text-sm text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
+            <span>Active: <strong className="text-white">{activeTournament ? activeTournament.name : 'No Tournament Selected'}</strong></span>
+            {activeTournament?.allowedEmailDomain && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-cyan-500/10 text-cricket-cyan border border-cyan-500/30">
+                <span>College Domain:</span>
+                <span className="font-mono text-white">{activeTournament.allowedEmailDomain}</span>
+              </span>
+            )}
           </p>
         </div>
 
@@ -492,6 +503,26 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, setActiv
                   className="w-full bg-stadium-surface border border-stadium-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-cricket-cyan"
                 />
               </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold uppercase tracking-wider text-cricket-cyan">
+                  Authorized College Email Domain <span className="text-rose-400">*</span>
+                </label>
+                <span className="text-[10px] text-slate-400 font-semibold uppercase">Multi-Tenant Gating</span>
+              </div>
+              <input
+                type="text"
+                required
+                placeholder="e.g. @scaler.edu or @iitb.ac.in"
+                value={tournamentForm.allowedEmailDomain}
+                onChange={(e) => setTournamentForm({ ...tournamentForm, allowedEmailDomain: e.target.value })}
+                className="w-full bg-stadium-surface border border-cricket-cyan/40 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-cricket-cyan font-mono"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Mandatory: Live auction is strictly isolated to students logging in with this college email domain.
+              </p>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

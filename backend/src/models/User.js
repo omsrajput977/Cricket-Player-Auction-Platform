@@ -17,13 +17,24 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, 'Password is required'],
+      required: function () {
+        return this.authProvider === 'LOCAL';
+      },
       minlength: [6, 'Password must be at least 6 characters long'],
     },
     role: {
       type: String,
-      enum: ['ADMIN', 'TEAM_OWNER'],
-      default: 'TEAM_OWNER',
+      enum: ['ADMIN', 'TEAM_OWNER', 'SPECTATOR'],
+      default: 'SPECTATOR',
+    },
+    authProvider: {
+      type: String,
+      enum: ['LOCAL', 'GOOGLE'],
+      default: 'LOCAL',
+    },
+    avatar: {
+      type: String,
+      default: null,
     },
     teamId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -38,7 +49,7 @@ const userSchema = new mongoose.Schema(
 
 // Hash password before saving if modified
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+  if (!this.password || !this.isModified('password')) return next();
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
@@ -50,6 +61,7 @@ userSchema.pre('save', async function (next) {
 
 // Compare password method
 userSchema.methods.comparePassword = async function (candidatePassword) {
+  if (!this.password) return false;
   return bcrypt.compare(candidatePassword, this.password);
 };
 

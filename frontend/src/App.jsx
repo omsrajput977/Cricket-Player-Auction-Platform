@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useSocket } from './context/SocketContext';
 import { apiRequest } from './utils/api';
@@ -10,31 +10,86 @@ import { PublicRegistrationPage } from './pages/PublicRegistrationPage';
 import { PublicLookupPage } from './pages/PublicLookupPage';
 
 export default function App() {
-  const { user, isAdmin } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { socket } = useSocket();
-  const [activeView, setActiveView] = useState('live-room');
+
+  // State-based view routing with path sync
+  const [activeView, setActiveView] = useState(() => {
+    const path = window.location.pathname;
+    if (path === '/auction/live' || path === '/auction') return 'live-room';
+    if (path === '/admin') return 'admin-setup';
+    if (path === '/nominate') return 'nominate';
+    if (path === '/lookup') return 'lookup';
+    if (path === '/login') return 'login';
+    return 'live-room';
+  });
+
   const [tournaments, setTournaments] = useState([]);
   const [activeTournament, setActiveTournament] = useState(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [loginRedirectMessage, setLoginRedirectMessage] = useState(null);
 
-  // Load Tournaments
-  const loadTournaments = async () => {
+  // Load Tournaments dynamically based on authenticated user's college email domain
+  const loadTournaments = useCallback(async () => {
     try {
       const res = await apiRequest('/tournaments');
-      if (res.success && res.data.length > 0) {
+      if (res.success && Array.isArray(res.data)) {
         setTournaments(res.data);
-        setActiveTournament(res.data[0]);
+        setActiveTournament((prev) => {
+          // If current selection is still in the authorized tournament list, keep it
+          if (prev && res.data.some((t) => t._id === prev._id)) {
+            return res.data.find((t) => t._id === prev._id);
+          }
+          // Otherwise pick the first authorized tournament (or null if none)
+          return res.data.length > 0 ? res.data[0] : null;
+        });
       }
     } catch (err) {
       console.error('Failed to load tournaments:', err.message);
     } finally {
       setInitialLoading(false);
     }
-  };
+  }, []);
 
+  // Reload tournaments whenever user auth state changes (login, logout, account switch)
   useEffect(() => {
     loadTournaments();
-  }, []);
+  }, [user, loadTournaments]);
+
+  // Route Protection: Ensure /auction/live strictly requires authentication
+  // Redirect unauthenticated users with college email sign-in toast
+  useEffect(() => {
+    if (authLoading) return;
+
+    const isLiveRoute = activeView === 'live-room' || window.location.pathname === '/auction/live';
+    if (isLiveRoute && !user) {
+      setLoginRedirectMessage('Please sign in with your college email to view this auction.');
+      setActiveView('login');
+      if (window.location.pathname !== '/login') {
+        window.history.replaceState(null, '', '/login');
+      }
+    }
+  }, [activeView, user, authLoading]);
+
+  // Sync browser URL with active view
+  const handleViewChange = (view) => {
+    if (view === 'live-room' && !user) {
+      setLoginRedirectMessage('Please sign in with your college email to view this auction.');
+      setActiveView('login');
+      window.history.pushState(null, '', '/login');
+      return;
+    }
+
+    setLoginRedirectMessage(null);
+    setActiveView(view);
+    const targetPath =
+      view === 'live-room'
+        ? '/auction/live'
+        : view === 'admin-setup'
+        ? '/admin'
+        : `/${view}`;
+    window.history.pushState(null, '', targetPath);
+  };
 
   // Real-time synchronization of tournament status changes across all clients
   useEffect(() => {
@@ -58,7 +113,7 @@ export default function App() {
     <div className="min-h-screen bg-stadium-darkest text-slate-100 flex flex-col">
       <Navbar
         activeView={activeView}
-        setActiveView={setActiveView}
+        setActiveView={handleViewChange}
         tournaments={tournaments}
         activeTournament={activeTournament}
         setActiveTournament={setActiveTournament}
@@ -66,13 +121,19 @@ export default function App() {
 
       <main className="flex-1">
         {activeView === 'login' ? (
-          <LoginPage onLoginSuccess={() => setActiveView('live-room')} />
+          <LoginPage
+            redirectMessage={loginRedirectMessage}
+            onLoginSuccess={() => {
+              setLoginRedirectMessage(null);
+              handleViewChange('live-room');
+            }}
+          />
         ) : activeView === 'nominate' ? (
           <PublicRegistrationPage
             tournaments={tournaments}
             activeTournament={activeTournament}
             setActiveTournament={setActiveTournament}
-            onSuccessRedirect={() => setActiveView('lookup')}
+            onSuccessRedirect={() => handleViewChange('lookup')}
           />
         ) : activeView === 'lookup' ? (
           <PublicLookupPage
@@ -84,7 +145,7 @@ export default function App() {
           <AdminSetupPage
             activeTournament={activeTournament}
             setActiveTournament={setActiveTournament}
-            setActiveView={setActiveView}
+            setActiveView={handleViewChange}
             onTournamentCreated={(newTourney) => {
               setTournaments((prev) => [newTourney, ...prev]);
               setActiveTournament(newTourney);
@@ -94,15 +155,14 @@ export default function App() {
           <LiveRoomPage
             activeTournament={activeTournament}
             setActiveTournament={setActiveTournament}
-            setActiveView={setActiveView}
+            setActiveView={handleViewChange}
           />
         )}
       </main>
 
-
       <footer className="glass-panel border-t border-stadium-border/60 py-4 px-6 text-center text-xs text-slate-500">
         <p>
-          CricAuction Live Engine • Sub-millisecond synchronized bidding for collegiate cricket tournaments
+          CricAuction Live Engine • Multi-Tenant Collegiate Cricket Player Auction Platform
         </p>
       </footer>
     </div>

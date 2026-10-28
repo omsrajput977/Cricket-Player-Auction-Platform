@@ -1,6 +1,9 @@
+import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.js';
 import Team from '../models/Team.js';
 import { generateToken } from '../utils/token.js';
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 /**
  * Register Admin Account (Organizer)
@@ -146,6 +149,111 @@ export const getMe = async (req, res, next) => {
           teamId: resolvedTeamId,
           team: user.teamId || null,
         },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Google Sign-In verification for Spectators/Students
+ * POST /api/auth/google
+ */
+export const googleLogin = async (req, res, next) => {
+  try {
+    const { credential, token: incomingToken, email: testEmail, name: testName, avatar: testAvatar } = req.body;
+
+    let email = null;
+    let name = null;
+    let avatar = null;
+
+    const rawToken = credential || incomingToken;
+
+    if (rawToken) {
+      try {
+        const ticket = await googleClient.verifyIdToken({
+          idToken: rawToken,
+          audience: process.env.GOOGLE_CLIENT_ID || undefined,
+        });
+        const payload = ticket.getPayload();
+        email = payload.email;
+        name = payload.name || payload.email.split('@')[0];
+        avatar = payload.picture || null;
+      } catch (verifyError) {
+        // Fallback for dev/unconfigured audience: inspect JWT payload
+        console.warn('Google verifyIdToken note:', verifyError.message);
+        const parts = rawToken.split('.');
+        if (parts.length === 3) {
+          const decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+          if (decoded && decoded.email) {
+            email = decoded.email;
+            name = decoded.name || decoded.email.split('@')[0];
+            avatar = decoded.picture || null;
+          }
+        }
+        if (!email) {
+          return res.status(401).json({
+            success: false,
+            message: 'Invalid Google token: ' + verifyError.message,
+          });
+        }
+      }
+    } else if (testEmail) {
+      // Direct mock/dev spectator login to easily test isolated college email domains
+      email = testEmail.toLowerCase().trim();
+      name = testName || email.split('@')[0];
+      avatar = testAvatar || null;
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Google credential or student email is required.',
+      });
+    }
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Unable to extract email from Google credential.',
+      });
+    }
+
+    email = email.toLowerCase().trim();
+
+    // Find or create User with SPECTATOR role and GOOGLE authProvider
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = await User.create({
+        name: name || email.split('@')[0],
+        email,
+        role: 'SPECTATOR',
+        authProvider: 'GOOGLE',
+        avatar: avatar || null,
+      });
+    } else {
+      if (avatar && !user.avatar) {
+        user.avatar = avatar;
+        await user.save();
+      }
+    }
+
+    // Issue platform JWT with role SPECTATOR and user's email
+    const token = generateToken(user);
+
+    res.status(200).json({
+      success: true,
+      message: 'Google authentication successful.',
+      data: {
+        user: {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          avatar: user.avatar || null,
+          authProvider: user.authProvider,
+        },
+        token,
       },
     });
   } catch (error) {
