@@ -317,12 +317,16 @@ export const registerAuctionSocketHandlers = (io) => {
         await engine.mutex.runExclusive(async () => {
           const session = engine.session;
 
-          if (session.isFinalizing) {
-            return socket.emit('ERROR', { message: 'Player sale is currently being finalized.' });
+          if (!session.activePlayer) {
+            return socket.emit('ERROR', { message: 'No player on the podium.' });
           }
 
-          if (!session.activePlayer || (session.status !== 'BIDDING' && session.status !== 'INTRODUCING')) {
-            return socket.emit('ERROR', { message: 'Bidding is not currently active for this player.' });
+          if (session.status === 'INTRODUCING') {
+            return socket.emit('ERROR', { message: 'Bidding has not started yet. Please click Start Timer first.' });
+          }
+
+          if (session.status !== 'BIDDING' || !session.timerRunning) {
+            return socket.emit('ERROR', { message: 'Bidding is not active for this player.' });
           }
 
           if (session.timerRunning && Date.now() >= session.endsAt) {
@@ -431,14 +435,27 @@ export const registerAuctionSocketHandlers = (io) => {
             });
           }
 
-          // 2. Guard: Active player exists & in bidding state
-          if (!session.activePlayer || (session.status !== 'BIDDING' && session.status !== 'INTRODUCING')) {
+          // 2. Guard: Active player exists on the podium
+          if (!session.activePlayer) {
             return socket.emit('BID_REJECTED', {
-              reason: 'Bidding is not currently active for this player.',
+              reason: 'No player is currently on the podium.',
             });
           }
 
-          // 3. Guard: Strict Time Boundary
+          // 3. Guard: Admin must start timer before bidding can commence
+          if (session.status === 'INTRODUCING') {
+            return socket.emit('BID_REJECTED', {
+              reason: 'Bidding has not started yet. Please wait for the auctioneer to start the timer.',
+            });
+          }
+
+          if (session.status !== 'BIDDING' || !session.timerRunning) {
+            return socket.emit('BID_REJECTED', {
+              reason: 'Bidding is not active. The timer is currently paused or expired.',
+            });
+          }
+
+          // 4. Guard: Strict Time Boundary
           if (session.timerRunning && Date.now() >= session.endsAt) {
             return socket.emit('BID_REJECTED', {
               reason: 'Bidding time has expired.',

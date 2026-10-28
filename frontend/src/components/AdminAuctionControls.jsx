@@ -101,6 +101,10 @@ export const AdminAuctionControls = ({
 
   const handleFallbackBid = () => {
     if (!socket || !selectedFallbackTeamId || !activePlayer) return;
+    if (status !== 'BIDDING' || !timerRunning) {
+      showError('Cannot place fallback bid: bidding timer has not been started yet.');
+      return;
+    }
     setActionLoading(true);
     socket.emit('ADMIN_FALLBACK_BID', {
       tournamentId,
@@ -268,7 +272,14 @@ export const AdminAuctionControls = ({
 
             <button
               onClick={handleFallbackBid}
-              disabled={actionLoading || !selectedFallbackTeamId || !activePlayer || selectedFallbackTeamId === currentBidderTeamId}
+              disabled={
+                actionLoading ||
+                !selectedFallbackTeamId ||
+                !activePlayer ||
+                selectedFallbackTeamId === currentBidderTeamId ||
+                status !== 'BIDDING' ||
+                !timerRunning
+              }
               className="px-4 py-2.5 rounded-xl font-extrabold text-xs bg-gradient-to-r from-cricket-gold to-amber-500 hover:brightness-110 text-slate-950 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 shadow-md shadow-amber-950/40"
             >
               ⚡ Force Fallback Bid

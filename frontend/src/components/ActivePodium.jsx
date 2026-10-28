@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
-import { User, Flame, Clock, AlertTriangle, ArrowUpRight, Award, Zap } from 'lucide-react';
+import { User, Flame, Clock, AlertTriangle, ArrowUpRight, Award, Zap, Pause } from 'lucide-react';
 
 export const ActivePodium = ({
   tournamentId,
@@ -76,6 +76,12 @@ export const ActivePodium = ({
   // Handle One-Click Bid Action
   const handlePlaceBid = () => {
     if (!socket || !isTeamOwner || biddingLoading || isUserTeamLeading) return;
+
+    if (status !== 'BIDDING' || !timerRunning || remainingSec === 0) {
+      setBidError('Bidding has not started yet. Please wait for the auctioneer to start the timer.');
+      setTimeout(() => setBidError(null), 3500);
+      return;
+    }
 
     setBidError(null);
     setBiddingLoading(true);
@@ -273,21 +279,41 @@ export const ActivePodium = ({
               disabled={
                 biddingLoading ||
                 isUserTeamLeading ||
-                (status !== 'BIDDING' && status !== 'INTRODUCING') ||
-                (timerRunning && remainingSec === 0)
+                status !== 'BIDDING' ||
+                !timerRunning ||
+                remainingSec === 0
               }
               className={`w-full md:w-auto px-8 py-4 rounded-xl font-extrabold text-base flex items-center justify-center gap-3 shadow-xl transition-all ${
                 isUserTeamLeading
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 cursor-not-allowed'
-                  : status !== 'BIDDING' && status !== 'INTRODUCING'
-                  ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-cricket-cyan via-emerald-400 to-emerald-500 text-slate-950 hover:brightness-110 active:scale-95 shadow-cyan-500/25'
+                  : status === 'INTRODUCING'
+                  ? 'bg-slate-800/90 text-amber-300/90 border border-amber-500/40 cursor-not-allowed shadow-none'
+                  : status === 'PAUSED'
+                  ? 'bg-slate-800/90 text-amber-400 border border-amber-500/40 cursor-not-allowed shadow-none'
+                  : status !== 'BIDDING' || !timerRunning || remainingSec === 0
+                  ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed shadow-none'
+                  : 'bg-gradient-to-r from-cricket-cyan via-emerald-400 to-emerald-500 text-slate-950 hover:brightness-110 active:scale-95 shadow-cyan-500/25 cursor-pointer'
               }`}
             >
               {isUserTeamLeading ? (
                 <>
                   <Award className="w-5 h-5 text-emerald-400" />
                   <span>YOUR TEAM LEADS</span>
+                </>
+              ) : status === 'INTRODUCING' ? (
+                <>
+                  <Clock className="w-5 h-5 text-amber-400 animate-pulse" />
+                  <span>AWAITING TIMER START</span>
+                </>
+              ) : status === 'PAUSED' ? (
+                <>
+                  <Pause className="w-5 h-5 text-amber-400" />
+                  <span>TIMER PAUSED</span>
+                </>
+              ) : status !== 'BIDDING' || !timerRunning || remainingSec === 0 ? (
+                <>
+                  <AlertTriangle className="w-5 h-5 text-rose-400" />
+                  <span>BIDDING CLOSED</span>
                 </>
               ) : (
                 <>
