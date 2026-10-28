@@ -22,6 +22,7 @@ export const AdminAuctionControls = ({
   teams,
   players,
   timerRunning,
+  remainingMs = 0,
   status,
   onRefresh,
 }) => {
@@ -205,19 +206,32 @@ export const AdminAuctionControls = ({
             Timer Orchestration
           </label>
           <div className="flex gap-2">
-            {!timerRunning ? (
+            {tournamentStatus === 'PAUSED' ? (
+              <button
+                disabled
+                className="flex-1 py-2.5 px-3 rounded-xl font-extrabold text-xs bg-slate-800/90 text-amber-400 border border-amber-500/40 cursor-not-allowed opacity-80 shadow-none transition-all flex items-center justify-center gap-1.5"
+                title="Tournament auction is paused by admin. Resume auction to operate timer."
+              >
+                <Pause className="w-4 h-4 fill-amber-400 text-amber-400" />
+                <span>Paused</span>
+              </button>
+            ) : !timerRunning ? (
               <button
                 onClick={status === 'PAUSED' ? handleResumeTimer : handleStartBidding}
                 disabled={!activePlayer}
-                className="flex-1 py-2.5 px-3 rounded-xl font-extrabold text-xs bg-emerald-500 hover:bg-emerald-400 text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 px-3 rounded-xl font-extrabold text-xs bg-emerald-500 hover:bg-emerald-400 text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Play className="w-4 h-4 fill-slate-950" />
-                <span>{status === 'PAUSED' ? 'Resume Timer' : 'Start Timer (20s)'}</span>
+                <span>
+                  {status === 'PAUSED'
+                    ? `Resume Timer ${remainingMs > 0 ? `(${Math.ceil(remainingMs / 1000)}s)` : ''}`
+                    : 'Start Timer (20s)'}
+                </span>
               </button>
             ) : (
               <button
                 onClick={handlePauseTimer}
-                className="flex-1 py-2.5 px-3 rounded-xl font-extrabold text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 px-3 rounded-xl font-extrabold text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Pause className="w-4 h-4 fill-slate-950" />
                 <span>Pause Timer</span>

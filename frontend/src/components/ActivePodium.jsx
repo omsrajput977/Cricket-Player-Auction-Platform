@@ -13,22 +13,36 @@ export const ActivePodium = ({
   endsAt,
   status,
   timerRunning,
+  remainingMs = 0,
   nextBidAmount,
 }) => {
   const { user, isTeamOwner } = useAuth();
   const { socket, getTrueServerTime } = useSocket();
 
-  const [remainingSec, setRemainingSec] = useState(0);
+  const [remainingSec, setRemainingSec] = useState(() => {
+    if (remainingMs > 0) return Math.ceil(remainingMs / 1000);
+    return 0;
+  });
   const [bidError, setBidError] = useState(null);
   const [biddingLoading, setBiddingLoading] = useState(false);
 
   // High precision timer synchronized with serverNow clock offset
   useEffect(() => {
+    // 1. If timer or auction is explicitly PAUSED, retain static remaining seconds
+    if (status === 'PAUSED' || tournamentStatus === 'PAUSED') {
+      if (remainingMs > 0) {
+        setRemainingSec(Math.ceil(remainingMs / 1000));
+      }
+      return;
+    }
+
+    // 2. If timer is not running and not paused, reset to 0
     if (!endsAt || !timerRunning) {
       setRemainingSec(0);
       return;
     }
 
+    // 3. Timer is active: calculate countdown from endsAt
     const updateTimer = () => {
       const now = getTrueServerTime();
       const diffMs = Math.max(0, endsAt - now);
@@ -40,7 +54,7 @@ export const ActivePodium = ({
     const interval = setInterval(updateTimer, 200);
 
     return () => clearInterval(interval);
-  }, [endsAt, timerRunning, getTrueServerTime]);
+  }, [endsAt, timerRunning, status, tournamentStatus, remainingMs, getTrueServerTime]);
 
   // Listen for socket bid rejections
   useEffect(() => {
@@ -115,7 +129,13 @@ export const ActivePodium = ({
   // Timer Color logic
   let timerBadgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
   let timerText = `${remainingSec}s`;
-  if (remainingSec <= 5 && remainingSec > 0) {
+  if (status === 'PAUSED') {
+    timerBadgeColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+    timerText = `${remainingSec}s (PAUSED)`;
+  } else if (status === 'INTRODUCING') {
+    timerBadgeColor = 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
+    timerText = 'Introducing Player';
+  } else if (remainingSec <= 5 && remainingSec > 0) {
     timerBadgeColor = 'bg-rose-500/20 text-rose-400 border-rose-500/40 animate-pulse-fast';
     timerText = `${remainingSec}s (Going Twice!)`;
   } else if (remainingSec <= 10 && remainingSec > 5) {
@@ -124,9 +144,6 @@ export const ActivePodium = ({
   } else if (remainingSec === 0 && status === 'PAUSED_EXPIRED') {
     timerBadgeColor = 'bg-rose-500/20 text-rose-400 border-rose-500/40';
     timerText = 'HAMMER DOWN';
-  } else if (status === 'INTRODUCING') {
-    timerBadgeColor = 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
-    timerText = 'Introducing Player';
   }
 
   return (

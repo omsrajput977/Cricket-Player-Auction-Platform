@@ -19,6 +19,7 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
   const [endsAt, setEndsAt] = useState(0);
   const [status, setStatus] = useState('IDLE');
   const [timerRunning, setTimerRunning] = useState(false);
+  const [remainingMs, setRemainingMs] = useState(0);
   const [nextBidAmount, setNextBidAmount] = useState(0);
   const [teams, setTeams] = useState([]);
   const [recentBids, setRecentBids] = useState([]);
@@ -77,6 +78,7 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
       setEndsAt(data.endsAt || 0);
       setStatus(data.status || 'IDLE');
       setTimerRunning(data.timerRunning || false);
+      setRemainingMs(data.remainingMs || 0);
       setNextBidAmount(data.nextBidAmount || 0);
       if (data.teams) setTeams(data.teams);
       if (data.recentBids) setRecentBids(data.recentBids);
@@ -90,6 +92,7 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
       setStatus(data.status || 'INTRODUCING');
       setTimerRunning(false);
       setEndsAt(0);
+      setRemainingMs(0);
       setNextBidAmount(data.nextBidAmount);
       setRecentBids([]);
       fetchTournamentPlayers();
@@ -103,6 +106,7 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
       setStatus('IDLE');
       setTimerRunning(false);
       setEndsAt(0);
+      setRemainingMs(0);
       setRecentBids([]);
       fetchTournamentPlayers();
     });
@@ -112,6 +116,7 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
       setStatus('BIDDING');
       setTimerRunning(true);
       setEndsAt(data.endsAt);
+      setRemainingMs(0);
     });
 
     // 5. Timer Synchronizations
@@ -119,16 +124,21 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
       setEndsAt(data.endsAt);
       setStatus(data.status || 'BIDDING');
       setTimerRunning(true);
+      setRemainingMs(0);
     });
 
     socket.on('TIMER_PAUSED', (data) => {
       setStatus('PAUSED');
       setTimerRunning(false);
+      if (data && data.remainingMs !== undefined) {
+        setRemainingMs(data.remainingMs);
+      }
     });
 
     socket.on('TIMER_EXPIRED', (data) => {
       setStatus('PAUSED_EXPIRED');
       setTimerRunning(false);
+      setRemainingMs(0);
     });
 
     // 6. Bid Accepted Broadcast
@@ -139,6 +149,7 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
       setEndsAt(data.endsAt);
       setTimerRunning(true);
       setStatus('BIDDING');
+      setRemainingMs(0);
 
       // Prepend to live activity feed
       setRecentBids((prev) => [
@@ -357,6 +368,7 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
           teams={teams}
           players={allPlayers}
           timerRunning={timerRunning}
+          remainingMs={remainingMs}
           status={status}
           onRefresh={fetchTournamentPlayers}
         />
@@ -385,6 +397,7 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
             endsAt={endsAt}
             status={status}
             timerRunning={timerRunning}
+            remainingMs={remainingMs}
             nextBidAmount={nextBidAmount}
           />
         </div>
