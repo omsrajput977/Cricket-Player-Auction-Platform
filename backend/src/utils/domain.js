@@ -35,5 +35,7 @@ export const formatDomain = (str) => {
 export const isDomainAllowed = (userEmail, allowedDomain) => {
   if (!allowedDomain || !allowedDomain.trim()) return true; // Unrestricted / public
   if (!userEmail) return false;
-  return normalizeDomain(userEmail) === normalizeDomain(allowedDomain);
+  const userDom = normalizeDomain(userEmail);
+  const allowedDom = normalizeDomain(allowedDomain);
+  return userDom === allowedDom || userDom.endsWith('.' + allowedDom);
 };

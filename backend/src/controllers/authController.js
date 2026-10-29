@@ -157,64 +157,138 @@ export const getMe = async (req, res, next) => {
 };
 
 /**
+ * Get Google OAuth Public Configuration
+ * GET /api/auth/google/config
+ */
+export const getGoogleConfig = (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID || null;
+  res.status(200).json({
+    success: true,
+    data: {
+      clientId,
+      isConfigured: !!clientId,
+    },
+  });
+};
+
+/**
+ * Generate Google OAuth2 Authorization URL
+ * GET /api/auth/google/url
+ */
+export const getGoogleAuthUrl = (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    return res.status(400).json({
+      success: false,
+      message: 'GOOGLE_CLIENT_ID is not configured in backend environment variables.',
+    });
+  }
+
+  const redirectUri =
+    req.query.redirectUri ||
+    `${req.protocol}://${req.get('host')}/auth/callback`;
+
+  const oauth2Client = new OAuth2Client(
+    clientId,
+    process.env.GOOGLE_CLIENT_SECRET,
+    redirectUri
+  );
+
+  const url = oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: ['openid', 'email', 'profile'],
+    prompt: 'select_account',
+  });
+
+  res.status(200).json({
+    success: true,
+    data: {
+      url,
+      clientId,
+    },
+  });
+};
+
+/**
  * Google Sign-In verification for Spectators/Students
  * POST /api/auth/google
  */
 export const googleLogin = async (req, res, next) => {
   try {
-    const { credential, token: incomingToken, email: testEmail, name: testName, avatar: testAvatar } = req.body;
+    const { credential, token: incomingToken, code, redirectUri } = req.body;
 
     let email = null;
     let name = null;
     let avatar = null;
+    let emailVerified = false;
 
-    const rawToken = credential || incomingToken;
+    const clientId = process.env.GOOGLE_CLIENT_ID;
 
-    if (rawToken) {
-      try {
-        const ticket = await googleClient.verifyIdToken({
-          idToken: rawToken,
-          audience: process.env.GOOGLE_CLIENT_ID || undefined,
+    // Flow 1: Authorization Code Flow (from Google redirect or popup)
+    if (code) {
+      if (!clientId) {
+        return res.status(500).json({
+          success: false,
+          message: 'GOOGLE_CLIENT_ID is not configured on the server.',
         });
-        const payload = ticket.getPayload();
-        email = payload.email;
-        name = payload.name || payload.email.split('@')[0];
-        avatar = payload.picture || null;
-      } catch (verifyError) {
-        // Fallback for dev/unconfigured audience: inspect JWT payload
-        console.warn('Google verifyIdToken note:', verifyError.message);
-        const parts = rawToken.split('.');
-        if (parts.length === 3) {
-          const decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
-          if (decoded && decoded.email) {
-            email = decoded.email;
-            name = decoded.name || decoded.email.split('@')[0];
-            avatar = decoded.picture || null;
-          }
-        }
-        if (!email) {
-          return res.status(401).json({
-            success: false,
-            message: 'Invalid Google token: ' + verifyError.message,
-          });
-        }
       }
-    } else if (testEmail) {
-      // Direct mock/dev spectator login to easily test isolated college email domains
-      email = testEmail.toLowerCase().trim();
-      name = testName || email.split('@')[0];
-      avatar = testAvatar || null;
+
+      const client = new OAuth2Client(
+        clientId,
+        process.env.GOOGLE_CLIENT_SECRET,
+        redirectUri || 'postmessage'
+      );
+
+      const { tokens } = await client.getToken(code);
+      if (!tokens || !tokens.id_token) {
+        return res.status(401).json({
+          success: false,
+          message: 'Failed to retrieve tokens from Google OAuth exchange.',
+        });
+      }
+
+      const ticket = await client.verifyIdToken({
+        idToken: tokens.id_token,
+        audience: clientId,
+      });
+      const payload = ticket.getPayload();
+      email = payload?.email;
+      name = payload?.name || (payload?.email ? payload.email.split('@')[0] : 'Student');
+      avatar = payload?.picture || null;
+      emailVerified = payload?.email_verified === true;
+    }
+    // Flow 2: Google Identity Services ID Token (from Google One-Tap / popup)
+    else if (credential || incomingToken) {
+      const rawToken = credential || incomingToken;
+      const client = new OAuth2Client(clientId);
+
+      const ticket = await client.verifyIdToken({
+        idToken: rawToken,
+        audience: clientId || undefined,
+      });
+      const payload = ticket.getPayload();
+      email = payload?.email;
+      name = payload?.name || (payload?.email ? payload.email.split('@')[0] : 'Student');
+      avatar = payload?.picture || null;
+      emailVerified = payload?.email_verified === true;
     } else {
       return res.status(400).json({
         success: false,
-        message: 'Google credential or student email is required.',
+        message: 'Google authorization code or verified credential is required.',
       });
     }
 
     if (!email) {
-      return res.status(400).json({
+      return res.status(401).json({
         success: false,
-        message: 'Unable to extract email from Google credential.',
+        message: 'Unable to extract verified email from Google authentication.',
+      });
+    }
+
+    if (!emailVerified) {
+      return res.status(403).json({
+        success: false,
+        message: 'This Google account email has not been verified by Google.',
       });
     }
 
@@ -257,6 +331,10 @@ export const googleLogin = async (req, res, next) => {
       },
     });
   } catch (error) {
-    next(error);
+    console.error('Google authentication error:', error.message);
+    return res.status(401).json({
+      success: false,
+      message: 'Google authentication failed: ' + (error.message || 'Invalid token or code'),
+    });
   }
 };
