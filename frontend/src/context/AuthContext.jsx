@@ -106,28 +106,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const sendSchoolEmailCode = async (email, tournamentId) => {
-    return await apiRequest('/auth/school-email/send-code', {
-      method: 'POST',
-      body: { email, tournamentId },
-    });
-  };
-
-  const verifySchoolEmailCode = async (email, code, name) => {
-    const res = await apiRequest('/auth/school-email/verify-code', {
-      method: 'POST',
-      body: { email, code, name },
-    });
-
-    if (res.success && res.data) {
-      setToken(res.data.token);
-      setUser(res.data.user);
-      localStorage.setItem('cricauction_token', res.data.token);
-      localStorage.setItem('cricauction_user', JSON.stringify(res.data.user));
-      return res.data;
-    }
-  };
-
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -143,8 +121,6 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         loginWithGoogle,
-        sendSchoolEmailCode,
-        verifySchoolEmailCode,
         registerAdmin,
         logout,
         isAuthenticated: !!user,
