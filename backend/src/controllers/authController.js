@@ -239,7 +239,10 @@ export const googleLogin = async (req, res, next) => {
         redirectUri || 'postmessage'
       );
 
-      const { tokens } = await client.getToken(code);
+      const { tokens } = await client.getToken({
+        code,
+        redirect_uri: redirectUri || 'postmessage',
+      });
       if (!tokens || !tokens.id_token) {
         return res.status(401).json({
           success: false,
@@ -331,10 +334,11 @@ export const googleLogin = async (req, res, next) => {
       },
     });
   } catch (error) {
-    console.error('Google authentication error:', error.message);
+    const errorDetails = error.response?.data?.error_description || error.response?.data?.error || error.message;
+    console.error('Google authentication error:', error.message, error.response?.data || '');
     return res.status(401).json({
       success: false,
-      message: 'Google authentication failed: ' + (error.message || 'Invalid token or code'),
+      message: 'Google authentication failed: ' + (errorDetails || 'Invalid token or code'),
     });
   }
 };
