@@ -23,6 +23,8 @@ import {
   Zap,
   Radio,
   ArrowRight,
+  Flag,
+  RotateCcw,
 } from 'lucide-react';
 import { UnsoldRecallDrawer } from '../components/UnsoldRecallDrawer';
 
@@ -145,6 +147,40 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, setActiv
         } else {
           notify('info', `⏸ Tournament auction paused. Bidding frozen on all screens.`);
         }
+      }
+    } catch (err) {
+      notify('error', err.message);
+    }
+  };
+
+  // Finish Tournament Auction
+  const handleFinishTournament = async () => {
+    if (!activeTournament) return;
+    try {
+      const res = await apiRequest(`/tournaments/${activeTournament._id}/status`, {
+        method: 'PATCH',
+        body: { status: 'COMPLETED' },
+      });
+      if (res.success) {
+        setActiveTournament(res.data);
+        notify('success', `🏆 Tournament auction has been completed and finalized!`);
+      }
+    } catch (err) {
+      notify('error', err.message);
+    }
+  };
+
+  // Re-open Live Auction
+  const handleReopenAuction = async () => {
+    if (!activeTournament) return;
+    try {
+      const res = await apiRequest(`/tournaments/${activeTournament._id}/status`, {
+        method: 'PATCH',
+        body: { status: 'LIVE_AUCTION' },
+      });
+      if (res.success) {
+        setActiveTournament(res.data);
+        notify('success', `🟢 Tournament is now LIVE! Bidding arena reopened.`);
       }
     } catch (err) {
       notify('error', err.message);
@@ -381,6 +417,8 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, setActiv
                   ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 animate-pulse-fast'
                   : activeTournament.status === 'PAUSED'
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  : activeTournament.status === 'COMPLETED'
+                  ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                   : 'bg-slate-800 text-slate-400 border-slate-700'
               }`}
             >
@@ -390,10 +428,16 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, setActiv
                     ? 'bg-emerald-400'
                     : activeTournament.status === 'PAUSED'
                     ? 'bg-amber-400'
+                    : activeTournament.status === 'COMPLETED'
+                    ? 'bg-purple-400'
                     : 'bg-slate-400'
                 }`}
               />
-              {activeTournament.status === 'LIVE_AUCTION' ? '● LIVE AUCTION' : activeTournament.status}
+              {activeTournament.status === 'LIVE_AUCTION'
+                ? '● LIVE AUCTION'
+                : activeTournament.status === 'COMPLETED'
+                ? '🏆 COMPLETED'
+                : activeTournament.status}
             </span>
 
             {/* Quick jump to live stage if live */}
@@ -408,26 +452,49 @@ export const AdminSetupPage = ({ activeTournament, setActiveTournament, setActiv
               </button>
             )}
 
-            <button
-              onClick={handleToggleLiveStatus}
-              className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all shadow-lg flex items-center gap-2 cursor-pointer ${
-                activeTournament.status === 'LIVE_AUCTION'
-                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20'
-                  : 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 hover:brightness-110 shadow-emerald-500/25'
-              }`}
-            >
-              {activeTournament.status === 'LIVE_AUCTION' ? (
-                <>
-                  <Pause className="w-4 h-4 fill-current" />
-                  <span>Pause Live Auction</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4 fill-current" />
-                  <span>Activate LIVE_AUCTION Mode</span>
-                </>
-              )}
-            </button>
+            {activeTournament.status === 'COMPLETED' ? (
+              <button
+                onClick={handleReopenAuction}
+                className="px-5 py-2.5 rounded-xl font-extrabold text-xs bg-slate-800 hover:bg-slate-700 text-purple-200 border border-purple-500/40 transition-all shadow-lg flex items-center gap-2 cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4 text-purple-400" />
+                <span>Re-open Live Auction</span>
+              </button>
+            ) : (
+              <>
+                {(activeTournament.status === 'LIVE_AUCTION' || activeTournament.status === 'PAUSED') && (
+                  <button
+                    onClick={handleFinishTournament}
+                    className="px-4 py-2.5 rounded-xl font-extrabold text-xs bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    title="Conclude and finish tournament auction"
+                  >
+                    <Flag className="w-4 h-4 text-rose-400" />
+                    <span>Finish Tournament</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={handleToggleLiveStatus}
+                  className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all shadow-lg flex items-center gap-2 cursor-pointer ${
+                    activeTournament.status === 'LIVE_AUCTION'
+                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20'
+                      : 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 hover:brightness-110 shadow-emerald-500/25'
+                  }`}
+                >
+                  {activeTournament.status === 'LIVE_AUCTION' ? (
+                    <>
+                      <Pause className="w-4 h-4 fill-current" />
+                      <span>Pause Live Auction</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>Activate LIVE_AUCTION Mode</span>
+                    </>
+                  )}
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

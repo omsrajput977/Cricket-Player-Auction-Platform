@@ -55,6 +55,8 @@ export const Navbar = ({ activeView, setActiveView, tournaments, activeTournamen
                     ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 animate-pulse-fast'
                     : activeTournament.status === 'PAUSED'
                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : activeTournament.status === 'COMPLETED'
+                    ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                     : 'bg-slate-800 text-slate-400 border-slate-700'
                 }`}
               >
@@ -62,6 +64,8 @@ export const Navbar = ({ activeView, setActiveView, tournaments, activeTournamen
                   ? '● LIVE'
                   : activeTournament.status === 'PAUSED'
                   ? '⏸ PAUSED'
+                  : activeTournament.status === 'COMPLETED'
+                  ? '🏆 COMPLETED'
                   : activeTournament.status || 'DRAFT'}
               </span>
             )}

@@ -308,7 +308,7 @@ export const registerAuctionSocketHandlers = (io) => {
 
     /**
      * ADMIN_UPDATE_TOURNAMENT_STATUS
-     * Directly toggles tournament status (LIVE_AUCTION / PAUSED) over WebSocket
+     * Directly toggles tournament status (LIVE_AUCTION / PAUSED / COMPLETED) over WebSocket
      */
     socket.on('ADMIN_UPDATE_TOURNAMENT_STATUS', async ({ tournamentId, status }) => {
       try {
@@ -322,21 +322,136 @@ export const registerAuctionSocketHandlers = (io) => {
         }
 
         tournament.status = status;
-        await tournament.save();
 
         const engine = await getTournamentEngine(tournamentId);
+
         if (status === 'PAUSED' && engine.session.timerRunning) {
           engine.pauseTimer(io);
           await engine.persistSnapshot();
+        } else if (status === 'COMPLETED') {
+          engine.clearTimerTimeout();
+          engine.session.timerRunning = false;
+          engine.session.endsAt = 0;
+          engine.session.remainingMs = 0;
+
+          if (engine.session.activePlayer) {
+            await Player.findByIdAndUpdate(engine.session.activePlayer._id, {
+              status: 'APPROVED',
+            });
+            engine.session.activePlayer = null;
+          }
+          engine.session.currentHighestBid = 0;
+          engine.session.currentBidderTeamId = null;
+          engine.session.currentBidderUserId = null;
+          engine.session.status = 'IDLE';
+          engine.session.snapshotVersion++;
+          await engine.persistSnapshot();
+
+          tournament.activeAuctionSession = {
+            activePlayerId: null,
+            currentHighestBid: 0,
+            currentBidderTeamId: null,
+            currentBidderUserId: null,
+            endsAt: 0,
+            status: 'IDLE',
+            snapshotVersion: engine.session.snapshotVersion,
+          };
         }
+
+        await tournament.save();
 
         io.to(tournamentId.toString()).emit('TOURNAMENT_STATUS_UPDATED', {
           tournamentId: tournament._id.toString(),
           status: tournament.status,
           tournament,
         });
+
+        if (status === 'COMPLETED') {
+          io.to(tournamentId.toString()).emit('TOURNAMENT_COMPLETED', {
+            tournamentId: tournament._id.toString(),
+            message: `Tournament "${tournament.name}" auction has officially finished!`,
+            completedAt: new Date().toISOString(),
+          });
+
+          io.to(tournamentId.toString()).emit('ROOM_STATE_SYNC', {
+            ...engine.getSnapshot(),
+            recentBids: [],
+            tournamentStatus: 'COMPLETED',
+          });
+        }
       } catch (err) {
         console.error('ADMIN_UPDATE_TOURNAMENT_STATUS error:', err.message);
+        socket.emit('ERROR', { message: err.message });
+      }
+    });
+
+    /**
+     * ADMIN_FINISH_TOURNAMENT
+     * Concludes the auction and marks the tournament as COMPLETED
+     */
+    socket.on('ADMIN_FINISH_TOURNAMENT', async ({ tournamentId }) => {
+      try {
+        if (socket.data.user.role !== 'ADMIN') {
+          return socket.emit('ERROR', { message: 'Forbidden: Admin role required.' });
+        }
+
+        const tournament = await Tournament.findById(tournamentId);
+        if (!tournament) {
+          return socket.emit('ERROR', { message: 'Tournament not found.' });
+        }
+
+        tournament.status = 'COMPLETED';
+
+        const engine = await getTournamentEngine(tournamentId);
+        engine.clearTimerTimeout();
+        engine.session.timerRunning = false;
+        engine.session.endsAt = 0;
+        engine.session.remainingMs = 0;
+
+        if (engine.session.activePlayer) {
+          await Player.findByIdAndUpdate(engine.session.activePlayer._id, {
+            status: 'APPROVED',
+          });
+          engine.session.activePlayer = null;
+        }
+        engine.session.currentHighestBid = 0;
+        engine.session.currentBidderTeamId = null;
+        engine.session.currentBidderUserId = null;
+        engine.session.status = 'IDLE';
+        engine.session.snapshotVersion++;
+        await engine.persistSnapshot();
+
+        tournament.activeAuctionSession = {
+          activePlayerId: null,
+          currentHighestBid: 0,
+          currentBidderTeamId: null,
+          currentBidderUserId: null,
+          endsAt: 0,
+          status: 'IDLE',
+          snapshotVersion: engine.session.snapshotVersion,
+        };
+
+        await tournament.save();
+
+        io.to(tournamentId.toString()).emit('TOURNAMENT_STATUS_UPDATED', {
+          tournamentId: tournament._id.toString(),
+          status: 'COMPLETED',
+          tournament,
+        });
+
+        io.to(tournamentId.toString()).emit('TOURNAMENT_COMPLETED', {
+          tournamentId: tournament._id.toString(),
+          message: `Tournament "${tournament.name}" auction has officially finished!`,
+          completedAt: new Date().toISOString(),
+        });
+
+        io.to(tournamentId.toString()).emit('ROOM_STATE_SYNC', {
+          ...engine.getSnapshot(),
+          recentBids: [],
+          tournamentStatus: 'COMPLETED',
+        });
+      } catch (err) {
+        console.error('ADMIN_FINISH_TOURNAMENT error:', err.message);
         socket.emit('ERROR', { message: err.message });
       }
     });

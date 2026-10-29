@@ -307,6 +307,8 @@ export const ActivePodium = ({
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 cursor-not-allowed'
                   : tournamentStatus === 'PAUSED'
                   ? 'bg-slate-800/90 text-amber-400 border border-amber-500/40 cursor-not-allowed shadow-none'
+                  : tournamentStatus === 'COMPLETED'
+                  ? 'bg-purple-900/40 text-purple-300 border border-purple-500/40 cursor-not-allowed shadow-none'
                   : tournamentStatus !== 'LIVE_AUCTION'
                   ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed shadow-none'
                   : status === 'INTRODUCING'
@@ -327,6 +329,11 @@ export const ActivePodium = ({
                 <>
                   <Pause className="w-5 h-5 text-amber-400" />
                   <span>AUCTION PAUSED BY ORGANIZER</span>
+                </>
+              ) : tournamentStatus === 'COMPLETED' ? (
+                <>
+                  <Award className="w-5 h-5 text-purple-400" />
+                  <span>TOURNAMENT AUCTION COMPLETED</span>
                 </>
               ) : tournamentStatus !== 'LIVE_AUCTION' ? (
                 <>

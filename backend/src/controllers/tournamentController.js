@@ -1,4 +1,5 @@
 import Tournament from '../models/Tournament.js';
+import Player from '../models/Player.js';
 import { getTournamentEngine } from '../services/auctionEngine.js';
 import { isDomainAllowed, formatDomain } from '../utils/domain.js';
 
@@ -196,6 +197,44 @@ export const updateTournamentStatus = async (req, res, next) => {
     if (status) tournament.status = status;
     if (currentRound) tournament.currentRound = currentRound;
 
+    // Handle COMPLETED state cleanup
+    if (status === 'COMPLETED') {
+      try {
+        const engine = await getTournamentEngine(tournament._id.toString());
+        if (engine) {
+          engine.clearTimerTimeout();
+          engine.session.timerRunning = false;
+          engine.session.endsAt = 0;
+          engine.session.remainingMs = 0;
+
+          if (engine.session.activePlayer) {
+            await Player.findByIdAndUpdate(engine.session.activePlayer._id, {
+              status: 'APPROVED',
+            });
+            engine.session.activePlayer = null;
+          }
+          engine.session.currentHighestBid = 0;
+          engine.session.currentBidderTeamId = null;
+          engine.session.currentBidderUserId = null;
+          engine.session.status = 'IDLE';
+          engine.session.snapshotVersion++;
+          await engine.persistSnapshot();
+        }
+
+        tournament.activeAuctionSession = {
+          activePlayerId: null,
+          currentHighestBid: 0,
+          currentBidderTeamId: null,
+          currentBidderUserId: null,
+          endsAt: 0,
+          status: 'IDLE',
+          snapshotVersion: (tournament.activeAuctionSession?.snapshotVersion || 0) + 1,
+        };
+      } catch (cleanErr) {
+        console.error('Error during tournament completion cleanup:', cleanErr.message);
+      }
+    }
+
     await tournament.save();
 
     // Broadcast status change in real time via Socket.io
@@ -219,6 +258,27 @@ export const updateTournamentStatus = async (req, res, next) => {
         status: tournament.status,
         tournament,
       });
+
+      if (tournament.status === 'COMPLETED') {
+        io.to(tournament._id.toString()).emit('TOURNAMENT_COMPLETED', {
+          tournamentId: tournament._id.toString(),
+          message: `Tournament "${tournament.name}" auction has officially finished!`,
+          completedAt: new Date().toISOString(),
+        });
+
+        try {
+          const engine = await getTournamentEngine(tournament._id.toString());
+          if (engine) {
+            io.to(tournament._id.toString()).emit('ROOM_STATE_SYNC', {
+              ...engine.getSnapshot(),
+              recentBids: [],
+              tournamentStatus: 'COMPLETED',
+            });
+          }
+        } catch (syncErr) {
+          console.error('Failed to emit ROOM_STATE_SYNC on tournament completion:', syncErr.message);
+        }
+      }
     }
 
     res.status(200).json({

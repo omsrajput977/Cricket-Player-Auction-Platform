@@ -7,7 +7,8 @@ import { FranchiseLeaderboard } from '../components/FranchiseLeaderboard';
 import { LiveBidFeed } from '../components/LiveBidFeed';
 import { AdminAuctionControls } from '../components/AdminAuctionControls';
 import { TeamRosterModal } from '../components/TeamRosterModal';
-import { Radio, AlertCircle, Eye, ShieldAlert, Play, Pause, Zap } from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { Radio, AlertCircle, Eye, ShieldAlert, Play, Pause, Zap, Flag, Trophy, RotateCcw, CheckCircle2 } from 'lucide-react';
 
 export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveView }) => {
   const { user, isAdmin } = useAuth();
@@ -27,6 +28,7 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
   const [soldBanner, setSoldBanner] = useState(null);
   const [selectedRosterTeam, setSelectedRosterTeam] = useState(null);
   const [domainRestrictedError, setDomainRestrictedError] = useState(null);
+  const [showFinishModal, setShowFinishModal] = useState(false);
 
   const tournamentId = activeTournament?._id;
 
@@ -66,6 +68,49 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
       }
     } catch (err) {
       console.error('Failed to toggle live status:', err.message);
+    }
+  };
+
+  // Finish Tournament
+  const handleFinishTournament = async () => {
+    if (!tournamentId) return;
+    try {
+      if (socket) {
+        socket.emit('ADMIN_FINISH_TOURNAMENT', { tournamentId });
+      }
+      const res = await apiRequest(`/tournaments/${tournamentId}/status`, {
+        method: 'PATCH',
+        body: { status: 'COMPLETED' },
+      });
+      if (res.success && setActiveTournament) {
+        setActiveTournament(res.data);
+      }
+      setShowFinishModal(false);
+      try {
+        confetti({
+          particleCount: 150,
+          spread: 80,
+          origin: { y: 0.6 },
+        });
+      } catch (e) {}
+    } catch (err) {
+      console.error('Failed to finish tournament:', err.message);
+    }
+  };
+
+  // Re-open Live Auction
+  const handleReopenAuction = async () => {
+    if (!tournamentId) return;
+    try {
+      const res = await apiRequest(`/tournaments/${tournamentId}/status`, {
+        method: 'PATCH',
+        body: { status: 'LIVE_AUCTION' },
+      });
+      if (res.success && setActiveTournament) {
+        setActiveTournament(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to reopen auction:', err.message);
     }
   };
 
@@ -220,6 +265,28 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
       }
     });
 
+    // 11. Tournament Completed Broadcast
+    socket.on('TOURNAMENT_COMPLETED', () => {
+      try {
+        confetti({
+          particleCount: 150,
+          spread: 80,
+          origin: { y: 0.6 },
+        });
+      } catch (e) {}
+      if (setActiveTournament) {
+        setActiveTournament((prev) => (prev ? { ...prev, status: 'COMPLETED' } : prev));
+      }
+      setActivePlayer(null);
+      setCurrentHighestBid(0);
+      setCurrentBidderTeamId(null);
+      setStatus('IDLE');
+      setTimerRunning(false);
+      setEndsAt(0);
+      setRecentBids([]);
+      fetchTournamentPlayers();
+    });
+
     return () => {
       socket.off('ROOM_STATE_SYNC');
       socket.off('PLAYER_ON_PODIUM');
@@ -233,6 +300,7 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
       socket.off('PLAYER_UNSOLD');
       socket.off('TEAMS_UPDATED');
       socket.off('ERROR');
+      socket.off('TOURNAMENT_COMPLETED');
     };
   }, [socket, tournamentId]);
 
@@ -277,7 +345,37 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
   return (
     <div className="max-w-[1600px] mx-auto px-4 lg:px-6 py-6 space-y-6">
       {/* Tournament Status Alert / Mode Strip */}
-      {activeTournament?.status === 'PAUSED' ? (
+      {activeTournament?.status === 'COMPLETED' ? (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-purple-950/70 via-indigo-950/60 to-slate-900/80 border border-purple-500/40 text-purple-200 shadow-xl shadow-purple-950/30 animate-fade-in">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center justify-center shrink-0 shadow-lg shadow-purple-500/20">
+              <Trophy className="w-7 h-7 text-purple-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-black text-base uppercase tracking-wider text-white">
+                  🏆 Tournament Auction Concluded & Finalized!
+                </span>
+                <span className="px-2.5 py-0.5 rounded text-[10px] font-black bg-purple-500/30 border border-purple-500/50 text-purple-200 uppercase tracking-wider">
+                  COMPLETED
+                </span>
+              </div>
+              <p className="text-xs text-purple-200/80 mt-1">
+                The bidding process has officially concluded. All franchise squads and purse expenditures are locked and finalized.
+              </p>
+            </div>
+          </div>
+          {isAdmin && (
+            <button
+              onClick={handleReopenAuction}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl font-extrabold text-xs bg-slate-800 hover:bg-slate-700 text-purple-200 border border-purple-500/40 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+            >
+              <RotateCcw className="w-4 h-4 text-purple-400" />
+              <span>Re-open Live Auction</span>
+            </button>
+          )}
+        </div>
+      ) : activeTournament?.status === 'PAUSED' ? (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center shrink-0">
@@ -298,13 +396,22 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
             </div>
           </div>
           {isAdmin && (
-            <button
-              onClick={handleToggleLiveStatus}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-black text-xs bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 hover:brightness-110 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap"
-            >
-              <Play className="w-4 h-4 fill-current" />
-              <span>Resume Live Auction</span>
-            </button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={() => setShowFinishModal(true)}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+              >
+                <Flag className="w-3.5 h-3.5" />
+                <span>Finish Tournament</span>
+              </button>
+              <button
+                onClick={handleToggleLiveStatus}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-black text-xs bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 hover:brightness-110 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span>Resume Live Auction</span>
+              </button>
+            </div>
           )}
         </div>
       ) : activeTournament?.status !== 'LIVE_AUCTION' ? (
@@ -346,7 +453,7 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
           )}
         </div>
       ) : (
-        <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse-fast"></span>
             <span className="font-extrabold uppercase tracking-wide text-white">LIVE AUCTION ACTIVE:</span>
@@ -355,13 +462,23 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
             </span>
           </div>
           {isAdmin && (
-            <button
-              onClick={handleToggleLiveStatus}
-              className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Pause className="w-3.5 h-3.5 fill-current" />
-              <span>Pause Auction</span>
-            </button>
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <button
+                onClick={() => setShowFinishModal(true)}
+                className="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Finish and conclude tournament auction"
+              >
+                <Flag className="w-3.5 h-3.5" />
+                <span>Finish Auction</span>
+              </button>
+              <button
+                onClick={handleToggleLiveStatus}
+                className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Pause className="w-3.5 h-3.5 fill-current" />
+                <span>Pause Auction</span>
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -455,6 +572,42 @@ export const LiveRoomPage = ({ activeTournament, setActiveTournament, setActiveV
           team={selectedRosterTeam}
           onClose={() => setSelectedRosterTeam(null)}
         />
+      )}
+
+      {/* Finish Tournament Confirmation Modal */}
+      {showFinishModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-panel p-6 sm:p-8 rounded-3xl max-w-md w-full border border-rose-500/40 shadow-2xl space-y-4 animate-fade-in bg-stadium-card">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/40 flex items-center justify-center shrink-0">
+                <Flag className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-lg text-white">Finish Tournament Auction?</h4>
+                <p className="text-xs text-slate-400">Finalize all team rosters and conclude bidding</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to finish the tournament auction? This will clear the podium, stop the countdown timer, lock bidding for all franchise owners, and mark the tournament as <strong className="text-purple-400 font-mono">COMPLETED</strong>.
+            </p>
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowFinishModal(false)}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleFinishTournament}
+                className="flex-1 py-2.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-rose-500 to-red-600 text-white hover:brightness-110 shadow-lg shadow-rose-950/40 cursor-pointer"
+              >
+                Yes, Finish Auction
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

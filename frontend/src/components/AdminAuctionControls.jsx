@@ -10,6 +10,8 @@ import {
   RotateCcw,
   ShieldCheck,
   AlertCircle,
+  Flag,
+  CheckCircle2,
 } from 'lucide-react';
 
 export const AdminAuctionControls = ({
@@ -31,6 +33,15 @@ export const AdminAuctionControls = ({
   const [selectedFallbackTeamId, setSelectedFallbackTeamId] = useState('');
   const [adminError, setAdminError] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+
+  const handleFinishTournament = () => {
+    if (!socket || !tournamentId) return;
+    setActionLoading(true);
+    socket.emit('ADMIN_FINISH_TOURNAMENT', { tournamentId });
+    setShowFinishConfirm(false);
+    setTimeout(() => setActionLoading(false), 800);
+  };
 
   // Filter approved upcoming players
   const upcomingPlayers = (players || []).filter(
@@ -137,6 +148,8 @@ export const AdminAuctionControls = ({
                   ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                   : tournamentStatus === 'PAUSED'
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  : tournamentStatus === 'COMPLETED'
+                  ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
                   : 'bg-slate-800 text-slate-400 border-slate-700'
               }`}
             >
@@ -146,6 +159,25 @@ export const AdminAuctionControls = ({
           {status && (
             <span className="text-xs font-mono font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-slate-800 text-cricket-gold border border-cricket-gold/30">
               Podium: {status}
+            </span>
+          )}
+
+          {/* Finish Tournament Auction Action */}
+          {tournamentStatus !== 'COMPLETED' ? (
+            <button
+              type="button"
+              onClick={() => setShowFinishConfirm(true)}
+              disabled={actionLoading}
+              className="px-3 py-1 rounded-full font-bold text-xs bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
+              title="Conclude and finish tournament auction"
+            >
+              <Flag className="w-3.5 h-3.5 text-rose-400" />
+              <span>Finish Tournament</span>
+            </button>
+          ) : (
+            <span className="px-3 py-1 rounded-full font-bold text-xs bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />
+              <span>Auction Completed</span>
             </span>
           )}
         </div>
@@ -318,6 +350,43 @@ export const AdminAuctionControls = ({
           </div>
         </div>
       </div>
+
+      {/* Finish Tournament Confirmation Modal */}
+      {showFinishConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-panel p-6 sm:p-7 rounded-2xl max-w-md w-full border border-rose-500/40 shadow-2xl space-y-4 animate-fade-in bg-stadium-card">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/40 flex items-center justify-center">
+                <Flag className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-base text-white">Finish Tournament Auction?</h4>
+                <p className="text-xs text-slate-400">Finalize squads and conclude bidding</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to officially finish this tournament auction? This will clear the active podium, stop any running timer, lock bidding for all teams, and mark the tournament status as <strong className="text-purple-400 font-mono">COMPLETED</strong>.
+            </p>
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowFinishConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleFinishTournament}
+                disabled={actionLoading}
+                className="flex-1 py-2.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-rose-500 to-red-600 text-white hover:brightness-110 shadow-lg shadow-rose-950/40 cursor-pointer disabled:opacity-50"
+              >
+                {actionLoading ? 'Concluding...' : 'Yes, Finish Auction'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
